@@ -29,8 +29,6 @@ let take_while f lexer =
   let len = length_while f lexer in
   String.sub lexer.input (lexer.pos.offset - len) len
 
-let is_whitespace = function ' ' | '\t' | '\r' | '\n' -> true | _ -> false
-
 let is_number_part = function '0' .. '9' | '.' | '-' -> true | _ -> false
 
 let number_of_string s =
@@ -42,7 +40,8 @@ let number_of_string s =
   float_of_string_opt s |> Option.map (fun x -> x *. k)
 
 let is_ident_part = function
-  | ' ' | '\t' | '\r' | '\n' | '(' | ')' | '[' | ']' | '{' | '}' | '"' -> false
+  | ' ' | '#' | '\t' | '\r' | '\n' | '(' | ')' | '[' | ']' | '{' | '}' | '"' ->
+      false
   | _ -> true
 
 let take_ident lexer = take_while is_ident_part lexer
@@ -62,25 +61,32 @@ let take_string lexer =
   in
   loop ()
 
-let next_token lexer =
-  let _ = length_while is_whitespace lexer in
-  let pos = lexer.pos in
-  let kind = match get_char lexer with
-    | Some '(' -> advance lexer; Some Token.OpenParen
-    | Some ')' -> advance lexer; Some Token.CloseParen
-    | Some '[' -> advance lexer; Some Token.OpenBlock
-    | Some ']' -> advance lexer; Some Token.CloseBlock
-    | Some '{' -> advance lexer; Some Token.OpenObject
-    | Some '}' -> advance lexer; Some Token.CloseObject
-    | Some '0'..'9' -> (
-        let s = take_while is_number_part lexer in
-        match number_of_string s with
-        | Some x -> Some (Token.Number x)
-        | None -> raise (Error ("invalid numeric literal \"" ^ s ^ "\"", pos)))
-    | Some '"' -> advance lexer; Some (Token.String (take_string lexer))
-    | Some _ when let cat = get_utf_8_uchar lexer |> Uucp.Gc.general_category in
-        cat = `Lu || cat = `Lt -> Some (Token.Variable (take_ident lexer))
-    | Some _ -> Some (Token.Method (take_ident lexer))
-    | None -> None
-  in
-  Option.map (fun kind : Token.t -> { kind; pos }) kind
+let rec next_token lexer =
+  match get_char lexer with
+  | Some (' ' | '\t' | '\r' | '\n') -> advance lexer; next_token lexer
+  | Some '#' ->
+      let _ = length_while (fun x -> x <> '\n') lexer in next_token lexer
+  | c ->
+      let pos = lexer.pos in
+      let kind = match c with
+        | Some '(' -> advance lexer; Some Token.OpenParen
+        | Some ')' -> advance lexer; Some Token.CloseParen
+        | Some '[' -> advance lexer; Some Token.OpenBlock
+        | Some ']' -> advance lexer; Some Token.CloseBlock
+        | Some '{' -> advance lexer; Some Token.OpenObject
+        | Some '}' -> advance lexer; Some Token.CloseObject
+        | Some '0'..'9' -> (
+            let s = take_while is_number_part lexer in
+            match number_of_string s with
+            | Some x -> Some (Token.Number x)
+            | None ->
+                raise (Error ("invalid numeric literal \"" ^ s ^ "\"", pos)))
+        | Some '"' -> advance lexer; Some (Token.String (take_string lexer))
+        | Some _
+          when let cat = get_utf_8_uchar lexer |> Uucp.Gc.general_category in
+               cat = `Lu || cat = `Lt ->
+            Some (Token.Variable (take_ident lexer))
+        | Some _ -> Some (Token.Method (take_ident lexer))
+        | None -> None
+      in
+      Option.map (fun kind : Token.t -> { kind; pos }) kind

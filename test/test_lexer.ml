@@ -26,7 +26,7 @@ let () =
     (Token.OpenObject,  4, 1, 5);
     (Token.CloseObject, 5, 1, 6);
   ];
-  test " (\r\n)\t" [(Token.OpenParen,  1, 1, 2); (Token.CloseParen, 4, 2, 1)];
+  test " (\r\n)\t" [(Token.OpenParen, 1, 1, 2); (Token.CloseParen, 4, 2, 1)];
   test "\"\"" [(Token.String "", 0, 1, 1)];
   test "\"abc\"" [(Token.String "abc", 0, 1, 1)];
   test "\"a\"\"b\"\"\" \"\"\"\"" [
