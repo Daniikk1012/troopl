@@ -29,7 +29,14 @@ let take_while f lexer =
   let len = length_while f lexer in
   String.sub lexer.input (lexer.pos.offset - len) len
 
-let is_number_part = function '0' .. '9' | '.' | '-' -> true | _ -> false
+let is_ident_part = function
+  | ' ' | '#' | '\t' | '\r' | '\n' | '(' | ')' | '[' | ']' | '{' | '}' | '"' ->
+      false
+  | _ -> true
+
+let take_ident lexer = take_while is_ident_part lexer
+
+let is_number_part = function '0' .. '9' | '.' -> true | _ -> false
 
 let number_of_string s =
   let (s, k) =
@@ -37,14 +44,9 @@ let number_of_string s =
       (String.sub s 0 (String.length s - 1), -1.0)
     else (s, 1.0)
   in
-  float_of_string_opt s |> Option.map (fun x -> x *. k)
-
-let is_ident_part = function
-  | ' ' | '#' | '\t' | '\r' | '\n' | '(' | ')' | '[' | ']' | '{' | '}' | '"' ->
-      false
-  | _ -> true
-
-let take_ident lexer = take_while is_ident_part lexer
+  if (String.for_all is_number_part s) then
+    float_of_string_opt s |> Option.map (fun x -> x *. k)
+  else None
 
 let take_string lexer =
   let buf = Buffer.create 16 in
@@ -76,7 +78,7 @@ let rec next_token lexer =
         | Some '{' -> advance lexer; Some Token.OpenObject
         | Some '}' -> advance lexer; Some Token.CloseObject
         | Some '0'..'9' -> (
-            let s = take_while is_number_part lexer in
+            let s = take_ident lexer in
             match number_of_string s with
             | Some x -> Some (Token.Number x)
             | None ->

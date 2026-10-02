@@ -16,6 +16,16 @@ let test string list =
   in
   loop list
 
+let test_fail string =
+  let lexer = Lexer.create string in
+  let rec loop () =
+    if Option.is_some (Lexer.next_token lexer) then
+      loop ()
+    else ()
+  in
+  try loop (); failwith "expected failure, but lexed normally"
+  with Lexer.Error _ -> ()
+
 let () =
   test "" [];
   test "()[]{}" [
@@ -38,4 +48,7 @@ let () =
     (Token.Method   "method",    9, 1, 10);
     (Token.Number   (-12.5),    16, 1, 17);
   ];
+  test_fail "\"";
+  test_fail "\"abc\"\"";
+  test_fail "1a";
   print_endline "test_lexer successful"
