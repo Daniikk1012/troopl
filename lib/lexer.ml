@@ -41,8 +41,8 @@ let is_number_part = function '0' .. '9' | '.' -> true | _ -> false
 let number_of_string s =
   let (s, k) =
     if String.ends_with ~suffix:"-" s then
-      (String.sub s 0 (String.length s - 1), -1.0)
-    else (s, 1.0)
+      (String.sub s 0 (String.length s - 1), -1.)
+    else (s, 1.)
   in
   if (String.for_all is_number_part s) then
     float_of_string_opt s |> Option.map (fun x -> x *. k)

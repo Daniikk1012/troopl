@@ -22,7 +22,7 @@ let test_fail string =
     | Eof -> ()
     | _   -> loop ()
   in
-  try loop (); failwith "expected failure, but lexed normally"
+  try loop (); assert false
   with Lexer.Error _ -> ()
 
 let () =
