@@ -6,48 +6,51 @@ let test string list =
     let token = Lexer.next_token lexer in
     match list with
     | (kind, offset, line, column) :: xs ->
-        let token = Option.get token in
         assert (token.kind       = kind);
         assert (token.pos.offset = offset);
         assert (token.pos.line   = line);
         assert (token.pos.column = column);
         loop xs
-    | [] -> assert (Lexer.next_token lexer |> Option.is_none)
+    | [] -> ()
   in
   loop list
 
 let test_fail string =
   let lexer = Lexer.create string in
   let rec loop () =
-    if Option.is_some (Lexer.next_token lexer) then
-      loop ()
-    else ()
+    match (Lexer.next_token lexer).kind with
+    | Eof -> ()
+    | _   -> loop ()
   in
   try loop (); failwith "expected failure, but lexed normally"
   with Lexer.Error _ -> ()
 
 let () =
-  test "" [];
+  test "" [Eof, 0, 1, 1; Eof, 0, 1, 1; Eof, 0, 1, 1];
   test "()[]{}" [
-    (Token.OpenParen,   0, 1, 1);
-    (Token.CloseParen,  1, 1, 2);
-    (Token.OpenBlock,   2, 1, 3);
-    (Token.CloseBlock,  3, 1, 4);
-    (Token.OpenObject,  4, 1, 5);
-    (Token.CloseObject, 5, 1, 6);
+    OpenParen,   0, 1, 1;
+    CloseParen,  1, 1, 2;
+    OpenBlock,   2, 1, 3;
+    CloseBlock,  3, 1, 4;
+    OpenObject,  4, 1, 5;
+    CloseObject, 5, 1, 6;
+    Eof,         6, 1, 7;
   ];
-  test " (\r\n)\t" [(Token.OpenParen, 1, 1, 2); (Token.CloseParen, 4, 2, 1)];
-  test "\"\"" [(Token.String "", 0, 1, 1)];
-  test "\"abc\"" [(Token.String "abc", 0, 1, 1)];
+  test " (\r\n)\t" [OpenParen, 1, 1, 2; CloseParen, 4, 2, 1; Eof, 6, 2, 3];
+  test "\"\"" [String "", 0, 1, 1; Eof, 2, 1, 3];
+  test "\"abc\"" [String "abc", 0, 1, 1; Eof, 5, 1, 6];
   test "\"a\"\"b\"\"\" \"\"\"\"" [
-    (Token.String "a\"b\"", 0, 1,  1);
-    (Token.String "\"",     9, 1, 10);
+    String "a\"b\"",  0, 1,  1;
+    String "\"",      9, 1, 10;
+    Eof,             13, 1, 14;
   ];
   test "Variable method 12.5-" [
-    (Token.Variable "Variable",  0, 1,  1);
-    (Token.Method   "method",    9, 1, 10);
-    (Token.Number   (-12.5),    16, 1, 17);
+    Variable "Variable",  0, 1,  1;
+    Method   "method",    9, 1, 10;
+    Number   (-12.5),    16, 1, 17;
+    Eof,                 21, 1, 22;
   ];
+  test "#()[]{}\nabc" [Method "abc", 8, 2, 1; Eof, 11, 2, 4];
   test_fail "\"";
   test_fail "\"abc\"\"";
   test_fail "1a";

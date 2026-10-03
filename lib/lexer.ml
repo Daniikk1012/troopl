@@ -63,32 +63,32 @@ let take_string lexer =
   in
   loop ()
 
-let rec next_token lexer =
+let rec next_token lexer : Token.t =
   match get_char lexer with
   | Some (' ' | '\t' | '\r' | '\n') -> advance lexer; next_token lexer
   | Some '#' ->
-      let _ = length_while (fun x -> x <> '\n') lexer in next_token lexer
+      ignore (length_while (fun x -> x <> '\n') lexer); next_token lexer
   | c ->
       let pos = lexer.pos in
-      let kind = match c with
-        | Some '(' -> advance lexer; Some Token.OpenParen
-        | Some ')' -> advance lexer; Some Token.CloseParen
-        | Some '[' -> advance lexer; Some Token.OpenBlock
-        | Some ']' -> advance lexer; Some Token.CloseBlock
-        | Some '{' -> advance lexer; Some Token.OpenObject
-        | Some '}' -> advance lexer; Some Token.CloseObject
+      let kind : Token.kind = match c with
+        | Some '(' -> advance lexer; OpenParen
+        | Some ')' -> advance lexer; CloseParen
+        | Some '{' -> advance lexer; OpenObject
+        | Some '}' -> advance lexer; CloseObject
+        | Some '[' -> advance lexer; OpenBlock
+        | Some ']' -> advance lexer; CloseBlock
         | Some '0'..'9' -> (
             let s = take_ident lexer in
             match number_of_string s with
-            | Some x -> Some (Token.Number x)
+            | Some x -> Number x
             | None ->
                 raise (Error ("invalid numeric literal \"" ^ s ^ "\"", pos)))
-        | Some '"' -> advance lexer; Some (Token.String (take_string lexer))
+        | Some '"' -> advance lexer; Token.String (take_string lexer)
         | Some _
           when let cat = get_utf_8_uchar lexer |> Uucp.Gc.general_category in
                cat = `Lu || cat = `Lt ->
-            Some (Token.Variable (take_ident lexer))
-        | Some _ -> Some (Token.Method (take_ident lexer))
-        | None -> None
+            Variable (take_ident lexer)
+        | Some _ -> Method (take_ident lexer)
+        | None -> Eof
       in
-      Option.map (fun kind : Token.t -> { kind; pos }) kind
+      { kind; pos }
