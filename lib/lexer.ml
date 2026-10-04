@@ -12,10 +12,11 @@ let get_utf_8_uchar lexer =
 
 let get_char lexer =
   if lexer.pos.offset < String.length lexer.input then
-    Some (String.get lexer.input lexer.pos.offset)
+    Some lexer.input.[lexer.pos.offset]
   else None
 
-let advance lexer = lexer.pos <- Position.next (get_utf_8_uchar lexer) lexer.pos
+let advance lexer =
+  lexer.pos <- Position.next (get_char lexer |> Option.get) lexer.pos
 
 let length_while f lexer =
   let rec loop n =

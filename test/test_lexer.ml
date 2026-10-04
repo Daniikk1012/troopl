@@ -39,6 +39,7 @@ let () =
   test " (\r\n)\t" [OpenParen, 1, 1, 2; CloseParen, 4, 2, 1; Eof, 6, 2, 3];
   test "\"\"" [String "", 0, 1, 1; Eof, 2, 1, 3];
   test "\"abc\"" [String "abc", 0, 1, 1; Eof, 5, 1, 6];
+  test "\"я\"" [String "я", 0, 1, 1; Eof, 4, 1, 4];
   test "\"a\"\"b\"\"\" \"\"\"\"" [
     String "a\"b\"",  0, 1,  1;
     String "\"",      9, 1, 10;
@@ -49,6 +50,11 @@ let () =
     Method   "method",    9, 1, 10;
     Number   (-12.5),    16, 1, 17;
     Eof,                 21, 1, 22;
+  ];
+  test "ЯЯЯ яяя" [
+    Variable "ЯЯЯ",  0, 1, 1;
+    Method "яяя",    7, 1, 5;
+    Eof,            13, 1, 8;
   ];
   test "#()[]{}\nabc" [Method "abc", 8, 2, 1; Eof, 11, 2, 4];
   test_fail "\"";
