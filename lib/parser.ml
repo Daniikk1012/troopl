@@ -42,17 +42,14 @@ let rec parse_statements parser : Expression.t =
           | _ ->
               let scope = variable in
               { kind = RecursiveDefinition { name; entries; scope }; pos })
-      | Method _ -> parse_call variable parser
-      | _ -> variable)
+      | _ -> parse_call variable parser)
   | { kind; pos } when is_value_start kind -> (
       let expr = parse_value parser in
       match parser.token.kind with
       | kind when is_value_start kind ->
           { kind = Sequence (expr, parse_statements parser); pos }
-      | Method _ -> parse_call expr parser
-      | _ -> expr)
-  | { kind = Method _; pos } -> parse_call { kind = Environment; pos } parser
-  | { pos } -> { kind = Environment; pos }
+      | _ -> parse_call expr parser)
+  | { pos } -> parse_call { kind = Environment; pos } parser
 
 and parse_value parser =
   match parser.token with

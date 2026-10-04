@@ -45,6 +45,6 @@ and string_of_entry entry =
 and string_of_entry_kind = function
   | Method { name; args; body } ->
       "Method " ^ name
-      ^ String.concat "" (List.map (fun s -> s ^ " ") args) ^ " = ("
+      ^ String.concat "" (List.map (fun s -> " " ^ s) args) ^ " = ("
       ^ to_string body ^ ")"
   | Inclusion expr -> "Inclusion (" ^ to_string expr ^ ")"
