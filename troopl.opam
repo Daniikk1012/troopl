@@ -4,6 +4,8 @@ synopsis: "A powerful minimal OO language with object capability system"
 description:
   "TrOOPL is a minimal object-oriented programming language with a purely functional core, where dependency injection, mutability, and capabilities like I/O and file system access are managed through explicitly passed and constructed environment objects."
 authors: ["Daniyar Sarbassov" "Nazar Tasmulayev" "Bogdan Ichshenko"]
+homepage: "https://github.com/Daniikk1012/troopl"
+bug-reports: "https://github.com/Daniikk1012/troopl/issues"
 depends: [
   "dune" {>= "3.24"}
   "ocaml"
@@ -24,4 +26,5 @@ build: [
     "@doc" {with-doc}
   ]
 ]
+dev-repo: "git+https://github.com/Daniikk1012/troopl.git"
 x-maintenance-intent: ["(latest)"]

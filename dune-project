@@ -4,7 +4,7 @@
 
 (generate_opam_files true)
 
-; (source (github User/repo)) ; TODO upload to repo
+(source (github Daniikk1012/troopl))
 
 (authors "Daniyar Sarbassov"
          "Nazar Tasmulayev"
