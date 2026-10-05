@@ -5,9 +5,11 @@ type t = {
 }
 
 let uninitialized () =
-  { number = None; methods = Hashtbl.create 12; initialized = false }
+  { number = None; methods = Hashtbl.create 16; initialized = false }
 
-let set_number value number = value.number <- Some number
+let set_number value number =
+  assert (not value.initialized);
+  value.number <- Some number
 
 let as_number value =
   if not value.initialized then
@@ -43,6 +45,19 @@ let get_method value name arity =
       Position.zero))
 
 let initialize value = value.initialized <- true
+
+let bind env value =
+  if not value.initialized then
+    raise (Runtime.Error (
+      "attempt to include methods from an uninitialized object",
+      Position.zero));
+  let value' = uninitialized () in
+  Option.iter (set_number value') value.number;
+  Hashtbl.iter
+    (fun key body -> Hashtbl.replace value'.methods key (fun _ -> body env))
+    value.methods;
+  initialize value';
+  value'
 
 let to_string value =
   "{ "

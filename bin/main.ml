@@ -2,10 +2,8 @@ open Troopl
 
 let () =
   let lowered =
-    Lexer.create "L {i N (N < 100000 then-else [L i (N + 1)] [N] run)} L i 0"
+    Lexer.create "E () (env run {E core {(E core) extend {(E core extend) number N {N asdf 0}}}} [1])"
     |> Parser.parse |> Lowerer.lower
   in
-  let env = Value.uninitialized () in
-  Value.initialize env;
-  Evaluator.eval lowered.scope_size env lowered.ir |> Value.to_string
+  Evaluator.eval lowered.scope_size Env.default lowered.ir |> Value.to_string
   |> print_endline

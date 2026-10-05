@@ -36,6 +36,7 @@ Source files and their responsibilies:
 |---------------------|-----------------------------------------|
 | `bin/main.ml`       | Entry point of the program              |
 | `lib/builtins.ml`   | Description of builtin types            |
+| `lib/env.ml`        | Description the default environment     |
 | `lib/evaluator.ml`  | Evaluator for the IR                    |
 | `lib/expression.ml` | Description of the AST                  |
 | `lib/ir.ml`         | Description of the IR                   |

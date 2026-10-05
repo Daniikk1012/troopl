@@ -13,8 +13,8 @@ let rec eval_ir scope env : Ir.t -> _ = function
       value
   | Sequence (a, b) -> ignore (eval_ir scope env a); eval_ir scope env b
   | Variable i -> Option.get (scope.(i))
-  | Number n -> Builtins.make_number n
-  | String s -> Builtins.make_string s
+  | Number n -> Builtins.make_number env n
+  | String s -> Builtins.make_string env s
   | Environment -> env
   | Call { value; name; args; pos } ->
       let value = eval_ir scope env value in

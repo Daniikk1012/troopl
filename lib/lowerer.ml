@@ -4,7 +4,7 @@ type lowered = { ir : Ir.t; scope_size : int }
 
 exception Error of string * Position.t
 
-let create () = { map = Hashtbl.create 12; index = 0 }
+let create () = { map = Hashtbl.create 16; index = 0 }
 
 let get_var lowerer name pos =
   match Hashtbl.find_opt lowerer.map name with
@@ -60,7 +60,7 @@ let rec lower_expr lowerer (expr : Expression.t) =
 and lower_entry lowerer entry =
   match entry.kind with
   | Method { name; args; body } ->
-      let indices = Hashtbl.create 12 in
+      let indices = Hashtbl.create 16 in
       List.iteri
         (fun i s ->
           if Hashtbl.mem indices s then

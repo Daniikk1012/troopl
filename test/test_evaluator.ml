@@ -1,19 +1,14 @@
 open Troopl
 
-let empty_env =
-  let env = Value.uninitialized () in
-  Value.initialize env;
-  env
-
 let eval env string =
   let lowered = Lexer.create string |> Parser.parse |> Lowerer.lower in
   Evaluator.eval lowered.scope_size env lowered.ir
 
 let check_number string number =
-  Value.as_number (eval empty_env string) = number
+  Value.as_number (eval Env.default string) = number
 
 let errors string =
-  try ignore (eval empty_env string); false with Runtime.Error _ -> true
+  try ignore (eval Env.default string); false with Runtime.Error _ -> true
 
 let () = assert (check_number "A 1 B 2 A + B"                  3.)
 let () = assert (check_number "A {1 a (A)} A a"                1.)
@@ -33,8 +28,9 @@ let () =
 
 let () =
   let env = Value.uninitialized () in
-  Value.add_method env "inc" 1 (fun _ values ->
-    (List.hd values |> Value.as_number) +. 1. |> Builtins.make_number);
+  Value.add_methods env Env.default;
+  Value.add_method env "inc" 1 (fun env values ->
+    (List.hd values |> Value.as_number) +. 1. |> Builtins.make_number env);
   Value.initialize env;
   assert (Value.as_number (eval env "inc 3") = 4.)
 
