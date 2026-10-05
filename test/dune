@@ -1,3 +1,4 @@
 (tests
- (names test_troopl test_position test_lexer test_parser test_lowerer)
+ (names test_troopl test_position test_lexer test_parser test_lowerer
+        test_evaluator)
  (libraries troopl))
