@@ -1,6 +1,7 @@
 val make_boolean : Value.t -> bool   -> Value.t
 val make_number  : Value.t -> float  -> Value.t
 val make_string  : Value.t -> string -> Value.t
+(* TODO: add make_list *)
 
 (* Not sure if these should be defined in this module *)
 val int_of_value     : Value.t -> int

@@ -62,6 +62,7 @@ let extend =
   Value.add_method value "boolean" 1 id;
   Value.add_method value "number"  1 id;
   Value.add_method value "string"  1 id;
+  Value.add_method value "list"    1 id;
   Value.initialize value;
   value
 
