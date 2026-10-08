@@ -25,10 +25,12 @@ let make_success env value =
   Value.initialize value';
   value
 
-let make_failure env =
+let make_failure env message =
   let value = Value.uninitialized () in
   let b = Builtins.make_boolean env false in
+  let s = Builtins.make_string env message in
   Value.add_method value "ok?" 0 (fun _ _ -> b);
+  Value.add_method value "message" 0 (fun _ _ -> s);
   Value.initialize value;
   value
 
@@ -38,7 +40,7 @@ let io =
     try
       List.hd values |> string_of_value env |> print_endline;
       make_success env value
-    with Sys_error _ -> make_failure env);
+    with Sys_error message -> make_failure env message);
   (* TODO: rest of io *)
   Value.initialize value;
   value
