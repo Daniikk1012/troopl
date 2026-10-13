@@ -51,4 +51,15 @@ Source files and their responsibilies:
 
 ## Language basics
 
-TODO (First need to actually implement everything from the spec)
+See [the 50 runnable examples](examples/README.md) for language basics,
+object composition, recursion, dynamic environments, and conveniences
+implemented in Troopl rather than as native built-ins.
+
+Run one from the repository root:
+
+```sh
+dune exec troopl -- examples/example_01.tr
+```
+
+Every example prints its result. `dune runtest` checks all 50 returned values
+and their exact output, alongside the existing interpreter tests.

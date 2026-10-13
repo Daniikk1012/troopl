@@ -1,0 +1,4 @@
+# Modulo versus remainder.
+Result ((7- rem 3) + (7- mod 3))
+(io print (Result to-string))
+Result

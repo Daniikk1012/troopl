@@ -1,0 +1,8 @@
+# Bind methods to an environment.
+E {() answer 42}
+Reader {run (answer)}
+Bound (env bind E Reader)
+Other {() answer 7}
+Result (env run Other [Bound run])
+(io print (Result to-string))
+Result

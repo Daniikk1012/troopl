@@ -1,0 +1,6 @@
+# Partial application through closures.
+Add {by X {run Y (X + Y)}}
+Add-Ten (Add by 10)
+Result (Add-Ten run 32)
+(io print (Result to-string))
+Result

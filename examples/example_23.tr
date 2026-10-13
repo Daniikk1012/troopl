@@ -1,0 +1,5 @@
+# Define boolean not in Troopl.
+Not {run B (B then-else (false) (true))}
+Result (Not run (false) then-else 1 0)
+(io print (Result to-string))
+Result

@@ -1,0 +1,8 @@
+# Define boolean and/or in Troopl.
+Boolean {
+  and A B (A then-else B (false))
+  or A B (A then-else (true) B)
+}
+Result (Boolean or (Boolean and (true) (false)) (true) then-else 1 0)
+(io print (Result to-string))
+Result

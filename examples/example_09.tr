@@ -1,0 +1,4 @@
+# Unicode scalar count, not byte count.
+Result ("я🙂" size)
+(io print (Result to-string))
+Result

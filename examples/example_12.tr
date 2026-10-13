@@ -1,0 +1,5 @@
+# Method parameters.
+Math {double X (X * 2)}
+Result (Math double 21)
+(io print (Result to-string))
+Result

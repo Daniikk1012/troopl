@@ -1,0 +1,8 @@
+# Compose function objects.
+Compose {run F G {run X (F run (G run X))}}
+Double {run X (X * 2)}
+Increment {run X (X + 1)}
+F (Compose run Double Increment)
+Result (F run 20)
+(io print (Result to-string))
+Result

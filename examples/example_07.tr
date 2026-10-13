@@ -1,0 +1,4 @@
+# Powers and rounding.
+Result ((2 ^ 5) + (2.8 floor) + (2.2 ceil) + (2.8- trunc))
+(io print (Result to-string))
+Result

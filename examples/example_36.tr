@@ -1,0 +1,13 @@
+# Concatenate minimal lists lazily.
+Concat {
+  run A B {
+    size ((A size) + (B size))
+    at I (I < (A size) then-else
+      [A at I] [B at (I - (A size))] run)
+  }
+}
+A {size 2 at I (I + 1)}
+B {size 2 at I (I + 3)}
+Result (Concat run A B at 3)
+(io print (Result to-string))
+Result

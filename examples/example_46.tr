@@ -1,0 +1,12 @@
+# Decorate new numbers through core extend number.
+Base (core)
+E {
+  ()
+  core {
+    Base
+    extend {(Base extend) number N {N unit "points"}}
+  }
+}
+Result (env run E [123 unit])
+(io print Result)
+Result

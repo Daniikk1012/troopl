@@ -1,0 +1,5 @@
+# Switch the dynamic environment.
+E {() answer 42}
+Result (env run E [(answer)])
+(io print (Result to-string))
+Result

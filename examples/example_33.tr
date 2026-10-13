@@ -1,0 +1,6 @@
+# A lazy indexed range.
+Range {new Start Stop {size (Stop - Start) at I (Start + I)}}
+R (Range new 10 15)
+Result (R at 3)
+(io print (Result to-string))
+Result

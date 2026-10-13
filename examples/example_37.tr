@@ -1,0 +1,10 @@
+# Linked lists need no built-in list factory.
+List {
+  empty {empty? (true)}
+  cons Head Tail {empty? (false) head (Head) tail (Tail)}
+  sum L (L empty? then-else [0] [(L head) + (List sum (L tail))] run)
+}
+L (List cons 10 (List cons 20 (List empty)))
+Result (List sum L)
+(io print (Result to-string))
+Result

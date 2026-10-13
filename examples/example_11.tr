@@ -1,0 +1,5 @@
+# Named object methods.
+Person {name "Ada" age 36}
+Result (Person name)
+(io print Result)
+Result

@@ -1,0 +1,15 @@
+# Add not through core extend boolean.
+Base (core)
+E {
+  ()
+  core {
+    Base
+    extend {
+      (Base extend)
+      boolean B {B not (B then-else (false) (true))}
+    }
+  }
+}
+Result (env run E [(true) not then-else 1 0])
+(io print (Result to-string))
+Result

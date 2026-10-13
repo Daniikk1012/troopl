@@ -1,0 +1,4 @@
+# Explicit grouping.
+Result (1 + (2 * 3))
+(io print (Result to-string))
+Result

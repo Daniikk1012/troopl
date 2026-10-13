@@ -1,0 +1,7 @@
+# Tail-recursive accumulation.
+Sum {
+  run N Acc (N = 0 then-else [Acc] [Sum run (N - 1) (Acc + N)] run)
+}
+Result (Sum run 100 0)
+(io print (Result to-string))
+Result

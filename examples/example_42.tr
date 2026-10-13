@@ -1,0 +1,14 @@
+# Materialize a list into an encapsulated array.
+Strict {
+  copy L A I (I = (L size) then-else [
+    {size (A size) at N (A at N)}
+  ] [
+    (A push (L at I))
+    Strict copy L A (I + 1)
+  ] run)
+  from L (Strict copy L (array) 0)
+}
+L (Strict from {size 3 at I (I * 10)})
+Result (L at 2)
+(io print (Result to-string))
+Result

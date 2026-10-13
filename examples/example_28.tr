@@ -1,0 +1,7 @@
+# Substring as a view.
+Slice {
+  run S Start Stop {size (Stop - Start) at I (S at (Start + I))}
+}
+Result (Slice run "abcdef" 1 4)
+(io print Result)
+Result

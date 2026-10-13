@@ -1,0 +1,11 @@
+# Concatenate strings using only size and at.
+Concat {
+  run A B {
+    size ((A size) + (B size))
+    at I (I < (A size) then-else
+      [A at I] [B at (I - (A size))] run)
+  }
+}
+Result (Concat run "Hello, " "Troopl!")
+(io print Result)
+Result

@@ -1,0 +1,5 @@
+# Overloading by arity.
+Adder {add 10 add X (10 + X) add X Y (X + Y)}
+Result ((Adder add) + (Adder add 2) + (Adder add 3 4))
+(io print (Result to-string))
+Result

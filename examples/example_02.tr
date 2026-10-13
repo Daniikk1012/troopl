@@ -1,0 +1,6 @@
+# Definitions and arithmetic.
+A 20
+B 22
+Result (A + B)
+(io print (Result to-string))
+Result

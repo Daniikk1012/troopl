@@ -1,0 +1,7 @@
+# Array set and pop.
+A (array push 10 push 20)
+(A set 0 7)
+Last (A pop)
+Result ((A at 0) + Last + (A size))
+(io print (Result to-string))
+Result

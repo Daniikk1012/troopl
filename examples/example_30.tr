@@ -1,0 +1,12 @@
+# Compare strings through their minimal interface.
+Equal {
+  scan A B I (I = (A size) then-else [(true)] [
+    (A at I) = (B at I) then-else
+      [Equal scan A B (I + 1)] [(false)] run
+  ] run)
+  run A B ((A size) = (B size) then-else
+    [Equal scan A B 0] [(false)] run)
+}
+Result (Equal run "same" "same" then-else 1 0)
+(io print (Result to-string))
+Result

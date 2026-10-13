@@ -1,0 +1,7 @@
+# Lazy map using run/1.
+Map {run L F {size (L size) at I (F run (L at I))}}
+Source {size 3 at I (I + 1)}
+Mapped (Map run Source {run X (X * X)})
+Result (Mapped at 2)
+(io print (Result to-string))
+Result

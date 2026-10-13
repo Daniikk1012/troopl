@@ -1,0 +1,5 @@
+# Define xor without numeric boolean conversion.
+Xor {run A B (A then-else (B then-else (false) (true)) B)}
+Result (Xor run (true) (false) then-else 1 0)
+(io print (Result to-string))
+Result

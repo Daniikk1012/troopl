@@ -1,0 +1,4 @@
+# Trailing minus denotes a negative literal.
+Result (12.5- + 2.5)
+(io print (Result to-string))
+Result

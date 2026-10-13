@@ -1,0 +1,4 @@
+# Characters are numeric code points.
+Result ("ABC" at 1)
+(io print (Result to-string))
+Result

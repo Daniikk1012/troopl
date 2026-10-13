@@ -1,0 +1,6 @@
+# Pairs as objects.
+Pair {new A B {first (A) second (B)}}
+P (Pair new 20 22)
+Result ((P first) + (P second))
+(io print (Result to-string))
+Result

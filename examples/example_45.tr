@@ -1,0 +1,7 @@
+# Lexical capture and dynamic environment are distinct.
+Offset 2
+Reader {run ((answer) + Offset)}
+E {() answer 40}
+Result (env run E [Reader run])
+(io print (Result to-string))
+Result

@@ -1,0 +1,7 @@
+# Recursive factorial.
+Factorial {
+  run N (N <= 1 then-else [1] [N * (Factorial run (N - 1))] run)
+}
+Result (Factorial run 6)
+(io print (Result to-string))
+Result

@@ -1,4 +1,5 @@
 (tests
  (names test_troopl test_position test_lexer test_parser test_lowerer
-        test_evaluator)
- (libraries troopl))
+        test_evaluator test_examples)
+ (libraries troopl unix)
+ (deps (source_tree ../examples)))

@@ -1,0 +1,6 @@
+# Explicit mutable state.
+Cell (box 1)
+(Cell set 42)
+Result (Cell get)
+(io print (Result to-string))
+Result

@@ -1,0 +1,5 @@
+# Array push supports chaining.
+A (array push 10 push 20 push 30)
+Result ((A at 1) + (A size))
+(io print (Result to-string))
+Result

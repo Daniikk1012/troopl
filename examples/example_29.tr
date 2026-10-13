@@ -1,0 +1,7 @@
+# Reverse as a view.
+Reverse {
+  run S {size (S size) at I (S at ((S size) - 1 - I))}
+}
+Result (Reverse run "desserts")
+(io print Result)
+Result

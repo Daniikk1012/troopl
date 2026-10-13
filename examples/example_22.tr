@@ -1,0 +1,6 @@
+# Inner lexical definitions preserve outer bindings.
+X 10
+(X 99 X)
+Result (X)
+(io print (Result to-string))
+Result

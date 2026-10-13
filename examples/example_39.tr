@@ -1,0 +1,10 @@
+# Encapsulated counter.
+Counter (
+  Cell (box 0)
+  {next ((Cell set ((Cell get) + 1)) Cell get)}
+)
+(Counter next)
+(Counter next)
+Result (Counter next)
+(io print (Result to-string))
+Result

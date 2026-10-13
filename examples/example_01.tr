@@ -1,0 +1,4 @@
+# Hello world.
+Result "Hello, Troopl!"
+(io print Result)
+Result

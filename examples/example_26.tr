@@ -1,0 +1,8 @@
+# Define fluent then/else in Troopl.
+Boolean {
+  extend B {B then Yes {else No (B then-else Yes No run)}}
+}
+Condition (Boolean extend (3 > 2))
+Result (Condition then [42] else [0])
+(io print (Result to-string))
+Result

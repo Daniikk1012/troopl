@@ -1,0 +1,6 @@
+# Object inclusion and overriding.
+Base {name "base" score 10}
+Child {Base name "child"}
+Result (Child score)
+(io print (Result to-string))
+Result

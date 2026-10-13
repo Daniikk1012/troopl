@@ -1,0 +1,6 @@
+# Construct a minimal two-element list.
+List {of A B {size 2 at I (I = 0 then-else A B)}}
+L (List of 20 22)
+Result ((L at 0) + (L at 1))
+(io print (Result to-string))
+Result

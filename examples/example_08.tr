@@ -1,0 +1,4 @@
+# Double quotes escape a quote.
+Result "He said ""hello"""
+(io print Result)
+Result

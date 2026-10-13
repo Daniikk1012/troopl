@@ -1,0 +1,11 @@
+# Fold using run/2.
+Fold {
+  step L F I Acc (I = (L size) then-else [Acc] [
+    Fold step L F (I + 1) (F run Acc (L at I))
+  ] run)
+  run L F Acc (Fold step L F 0 Acc)
+}
+Range {size 5 at I (I + 1)}
+Result (Fold run Range {run A B (A + B)} 0)
+(io print (Result to-string))
+Result

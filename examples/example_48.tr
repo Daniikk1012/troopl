@@ -1,0 +1,5 @@
+# Evaluate code in the current environment.
+E {() answer 42}
+Result (env run E [(eval "answer")])
+(io print (Result to-string))
+Result

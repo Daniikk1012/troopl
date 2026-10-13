@@ -1,0 +1,4 @@
+# Only the selected block executes.
+Result (1 < 2 then-else [42] [(crash "unselected")] run)
+(io print (Result to-string))
+Result

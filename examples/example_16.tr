@@ -1,0 +1,5 @@
+# Numeric object inclusion.
+Tagged {123 label "ticket"}
+Result (Tagged + 7)
+(io print (Result to-string))
+Result

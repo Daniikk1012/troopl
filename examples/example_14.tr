@@ -1,0 +1,6 @@
+# Lexical capture.
+Offset 5
+Add {run X (Offset + X)}
+Result (Add run 37)
+(io print (Result to-string))
+Result

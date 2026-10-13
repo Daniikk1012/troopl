@@ -1,0 +1,5 @@
+# Recursive self reference.
+Self {value 42 self (Self)}
+Result (Self self value)
+(io print (Result to-string))
+Result

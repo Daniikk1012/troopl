@@ -1,0 +1,5 @@
+# Blocks expose run/0.
+Work [6 * 7]
+Result (Work run)
+(io print (Result to-string))
+Result
