@@ -49,8 +49,8 @@ let rec lower_expr lowerer (expr : Expression.t) =
       Sequence (a, b)
   | Object entries -> Object (List.map (lower_entry lowerer) entries)
   | Variable v -> Variable (get_var lowerer v expr.pos)
-  | Number n -> Number n
-  | String s -> String s
+  | Number n -> Number (n, expr.pos)
+  | String s -> String (s, expr.pos)
   | Environment -> Environment
   | Call { value; name; args } ->
       let value = lower_expr lowerer value in

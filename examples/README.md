@@ -88,17 +88,17 @@ checking. Lazy map reevaluates its function on every access, unlike a strict map
 - Booleans select values; select blocks and call `run` for lazy branches.
 - Strings expose Unicode scalar values, not Java UTF-16 code units.
 - `[]` runs to the current environment. Use `[{}]` to return an empty object.
-- `box set` and `array push` return their receiver; `array set` returns the
-  assigned element, and `array pop` returns the removed element.
+- `box set`, `array push`, and `array set` return their receiver;
+  `array pop` returns the removed element.
 - Extension hooks are `core extend number`, `core extend boolean`, etc.
 - `eval` currently takes one source-string argument and uses the current
   environment. Example 48 supplies an environment through `env run`.
-- No examples depend on unimplemented filesystem, import, native list factories,
-  native boolean conveniences, native string conveniences, or `core from-seq`.
+- No examples depend on filesystem access, module import, native list factories,
+  native boolean conveniences, or native string conveniences.
 
-The catalogue follows the current implementation, not every proposed API in the
-specification. In particular, it avoids `core tag` and IO success-status probing:
-those paths are not needed to demonstrate the language's object model.
+The catalogue follows the current implementation. The native environment also
+provides file and UTF-8 capabilities, initialized `core tag` values, and
+fallible IO results; see the project README and standard library for those APIs.
 
 `expectations.tsv` records independently specified expected results and stdout;
 `test/test_examples.ml` evaluates all 50 files with the real default environment.

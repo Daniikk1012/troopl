@@ -1,0 +1,20 @@
+# Run from the repository root:
+# dune exec troopl -- stdlib/demo.tr
+Bytes (fs read "stdlib/stdlib.tr")
+(Bytes ok? then-else [{}] [(crash (Bytes message))] run)
+Source (utf-8 to-string Bytes)
+(Source ok? then-else [{}] [(crash (Source message))] run)
+(Source remainder size = 0 then-else [{}] [
+  crash "incomplete UTF-8 standard library"
+] run)
+Loader {() filename "stdlib/stdlib.tr"}
+Stdlib (env run Loader [(eval Source)])
+Environment (Stdlib extend ())
+(env run Environment [
+  (io print ("Hello" + ", " + "Troopl!"))
+  (io print ((list range 1 6) fold {run A B (A + B)} 0 to-string))
+  (io print ((false) then ["unused"] else-if [(true)] [
+    "lazy else-if"
+  ] else ["unused"]))
+  (io print ("я🙂" reverse))
+])

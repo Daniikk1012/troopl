@@ -1,6 +1,6 @@
 type t = {
-  mutable number      : float option;
-  methods             : (string * int, t -> t list -> t) Hashtbl.t;
+  mutable number : float option;
+  methods : (string * int, t -> t list -> t) Hashtbl.t;
   mutable initialized : bool;
 }
 
@@ -11,15 +11,17 @@ let set_number value number =
   assert (not value.initialized);
   value.number <- Some number
 
+let ensure_initialized value =
+  if not value.initialized then
+    Runtime.error "attempt to call a method on an uninitialized object"
+
 let as_number value =
   if not value.initialized then
-    raise (Runtime.Error (
-      "attempt to extract numeric representation of an uninitialized object",
-      Position.zero));
+    Runtime.error
+      "attempt to extract numeric representation of an uninitialized object";
   match value.number with
   | Some n -> n
-  | None -> raise
-      (Runtime.Error ("object has no numeric representation", Position.zero))
+  | None -> Runtime.error "object has no numeric representation"
 
 let add_method value name arity body =
   assert (not value.initialized);
@@ -28,36 +30,31 @@ let add_method value name arity body =
 let add_methods into from =
   assert (not into.initialized);
   if not from.initialized then
-    raise (Runtime.Error (
-      "attempt to include methods from an uninitialized object",
-      Position.zero));
+    Runtime.error "attempt to include methods from an uninitialized object";
   Option.iter (set_number into) from.number;
   Hashtbl.iter (Hashtbl.replace into.methods) from.methods
 
 let get_method value name arity =
-  if not value.initialized then
-    raise (Runtime.Error
-      ("attempt to call a method on an uninitialized object", Position.zero));
+  ensure_initialized value;
   match Hashtbl.find_opt value.methods (name, arity) with
   | Some f -> f
-  | None -> raise (Runtime.Error (
-      "method " ^ name ^ "/" ^ string_of_int arity ^ " not found",
-      Position.zero))
+  | None ->
+      Runtime.error
+        ("method " ^ name ^ "/" ^ string_of_int arity ^ " not found")
 
 let initialize value = value.initialized <- true
 
-let bind env value =
-  if not value.initialized then
-    raise (Runtime.Error (
-      "attempt to include methods from an uninitialized object",
-      Position.zero));
-  let value' = uninitialized () in
-  Option.iter (set_number value') value.number;
+let bind ?(before = fun () -> ()) env value =
+  ensure_initialized value;
+  let bound = uninitialized () in
+  Option.iter (set_number bound) value.number;
   Hashtbl.iter
-    (fun key body -> Hashtbl.replace value'.methods key (fun _ -> body env))
+    (fun key body ->
+      Hashtbl.replace bound.methods key
+        (fun _ args -> before (); (body [@tailcall]) env args))
     value.methods;
-  initialize value';
-  value'
+  initialize bound;
+  bound
 
 let to_string value =
   "{ "

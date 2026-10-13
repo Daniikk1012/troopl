@@ -1,4 +1,4 @@
-# TrOOPL - OCaml intepreter
+# TrOOPL - OCaml interpreter
 
 TrOOPL is an object-oriented language in which values expose methods identified
 by their name and arity. Objects can include other objects, methods capture
@@ -20,9 +20,9 @@ lexical variables, and capabilities are supplied through a dynamic environment.
   dune runtest
   ```
 
-As of right now, we haven't tested which OCaml versions work with this project,
-therefore we do not give a concrete minimal version. 5.3.0 works at the very
-least.
+The package requires OCaml 5.3 or newer and Dune 3.24 or newer. Verification
+uses OCaml 5.3.0 and Dune 3.24.0. Earlier OCaml releases are not supported by
+the package metadata.
 
 ## Contributing
 
@@ -37,6 +37,10 @@ Source files and their responsibilies:
 | `bin/main.ml`       | Entry point of the program              |
 | `lib/builtins.ml`   | Description of builtin types            |
 | `lib/env.ml`        | Description the default environment     |
+| `lib/encoding.ml`   | UTF-8 conversion and lazy remainders     |
+| `lib/filesystem.ml` | Byte-file and streaming capabilities    |
+| `lib/outcome.ml`    | Recoverable success/failure objects      |
+| `lib/utf8.ml`       | UTF-8 scalar validation and decoding     |
 | `lib/evaluator.ml`  | Evaluator for the IR                    |
 | `lib/expression.ml` | Description of the AST                  |
 | `lib/ir.ml`         | Description of the IR                   |
@@ -63,3 +67,23 @@ dune exec troopl -- examples/example_01.tr
 
 Every example prints its result. `dune runtest` checks all 50 returned values
 and their exact output, alongside the existing interpreter tests.
+
+## Environment and standard library
+
+The [native environment](doc/ENVIRONMENT.md) implements the interfaces from
+`TrOOPL specification-2.pdf`, sections 5.12 and 6.6: byte filesystem access,
+UTF-8 conversion, IO, dynamic environments, evaluation, mutable boxes/arrays,
+builtin extensions, filenames, exit, and crash.
+
+The [English standard library](stdlib/README.md) is opt-in and written in
+Troopl. It supplies boolean control flow, string/list operations, text-file
+helpers, and module import using the environment-wrapper pattern.
+
+```sh
+dune exec troopl -- stdlib/demo.tr
+```
+
+Errors print `filename:line:column: category: message` to stderr and exit
+with status 1. Runtime filenames come from the active environment's
+`filename` method, with a source-filename fallback if it is missing or invalid.
+Position tracking uses bounded per-domain state and preserves guest tail calls.

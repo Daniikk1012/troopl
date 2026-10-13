@@ -11,7 +11,7 @@ let () =
   match lower "A 1 B A B" 2 with
   | Definition {
       index = 0;
-      value = Number 1.;
+      value = Number (1., _);
       scope = Definition { index = 1; value = Variable 0; scope = Variable 1};
     } -> ()
   | _ -> assert false
@@ -20,7 +20,7 @@ let () =
   match lower "A 1 B {a (A) b X (B) c C (C)} C 2 C" 3 with
   | Definition {
       index = 0;
-      value = Number 1.;
+      value = Number (1., _);
       scope = RecursiveDefinition {
         index = 1;
         entries = [
@@ -46,14 +46,14 @@ let () =
             scope_size = 1;
           };
         ];
-        scope = Definition { index = 2; value = Number 2.; scope = Variable 2 };
+        scope = Definition { index = 2; value = Number (2., _); scope = Variable 2 };
       };
     } -> ()
   | _ -> assert false
 
 let () =
   match lower "1 2 3" 0 with
-  | Sequence (Number 1., Sequence (Number 2., Number 3.)) -> ()
+  | Sequence (Number (1., _), Sequence (Number (2., _), Number (3., _))) -> ()
   | _ -> assert false
 
 let () =
@@ -62,10 +62,10 @@ let () =
   with
   | Definition {
       index = 0;
-      value = Number 1.;
+      value = Number (1., _);
       scope = Definition {
         index = 1;
-        value = Number 2.;
+        value = Number (2., _);
         scope = Object [
           Inclusion { value = Variable 0 };
           Inclusion { value = Variable 1 };
@@ -106,22 +106,22 @@ let () =
   match lower "A (A 1) A A" 3 with
   | Definition {
       index = 1;
-      value = Definition { index = 0; value = Number 1.; scope = Variable 0 };
+      value = Definition { index = 0; value = Number (1., _); scope = Variable 0 };
       scope = Definition { index = 2; value = Variable 1; scope = Variable 2 };
     } -> ()
   | _ -> assert false
 
 let () =
   match lower "\"abc\"" 0 with
-  | String "abc" -> ()
+  | String ("abc", _) -> ()
   | _ -> assert false
 
 let () =
   match lower "1 + 2 - 3" 0 with
   | Call {
-      value = Call { value = Number 1.; name = "+"; args = [Number 2.] };
+      value = Call { value = Number (1., _); name = "+"; args = [Number (2., _)] };
       name = "-";
-      args = [Number 3.];
+      args = [Number (3., _)];
     } -> ()
   | _ -> assert false
 

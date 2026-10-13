@@ -2,7 +2,25 @@ type t = { input : string; mutable pos : Position.t }
 
 exception Error of string * Position.t
 
-let create input = { input; pos = Position.zero }
+let create ?filename input =
+  let pos = match filename with
+    | None -> Position.zero
+    | Some name -> Position.with_filename name Position.zero
+  in
+  let rec validate i position =
+    if i < String.length input then (
+      let decoded = String.get_utf_8_uchar input i in
+      if not (Uchar.utf_decode_is_valid decoded) then
+        raise (Error ("invalid UTF-8", position));
+      let count = Uchar.utf_decode_length decoded in
+      let next = ref position in
+      for j = 0 to count - 1 do
+        next := Position.next input.[i + j] !next
+      done;
+      validate (i + count) !next)
+  in
+  validate 0 pos;
+  { input; pos }
 
 let get_utf_8_uchar lexer =
   let d = String.get_utf_8_uchar lexer.input lexer.pos.offset in

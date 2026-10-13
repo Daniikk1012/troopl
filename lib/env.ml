@@ -1,141 +1,166 @@
-let string_of_value env value =
-  let at   = Value.get_method value "at"   1 env in
-  let size = Value.get_method value "size" 0 env [] |> Builtins.int_of_value in
-  if size < 0 then
-    raise (Runtime.Error (
-      "invalid size " ^ Builtins.string_of_number (float size),
-      Position.zero));
-  let buf = Buffer.create 12 in
-  for i = 0 to size - 1 do
-    let n = at [Builtins.make_number env (float i)] |> Builtins.int_of_value in
-    let u =
-      try Uchar.of_int n with Invalid_argument _ -> raise (Runtime.Error (
-        "invalid character code " ^ Builtins.string_of_number (float n),
-        Position.zero))
+let make_io ~input ~output ~error =
+  let writer channel =
+    let value = Value.uninitialized () in
+    let print newline env args =
+      let text = List.hd args |> Builtins.string_of_value env in
+      Outcome.attempt env (fun () ->
+        output_string channel text;
+        if newline then (output_char channel '\n'; flush channel);
+        value)
     in
-    Buffer.add_utf_8_uchar buf u
-  done;
-  Buffer.contents buf
-
-let make_success env value =
-  let value' = Value.uninitialized () in
-  Value.add_methods value' value;
-  let b = Builtins.make_boolean env true in
-  Value.add_method value' "ok?" 0 (fun _ _ -> b);
-  Value.initialize value';
-  value
-
-let make_failure env message =
-  let value = Value.uninitialized () in
-  let b = Builtins.make_boolean env false in
-  let s = Builtins.make_string env message in
-  Value.add_method value "ok?" 0 (fun _ _ -> b);
-  Value.add_method value "message" 0 (fun _ _ -> s);
-  Value.initialize value;
-  value
-
-let io =
-  let value = Value.uninitialized () in
-  Value.add_method value "print" 1 (fun env values ->
+    Value.add_method value "print" 1 (print true);
+    Value.add_method value "raw-print" 1 (print false);
+    value
+  in
+  let err = writer error |> Outcome.finish in
+  let io = writer output in
+  Value.add_method io "error" 0 (fun _ _ -> err);
+  Value.add_method io "read-line" 0 (fun env _ ->
     try
-      List.hd values |> string_of_value env |> print_endline;
-      make_success env value
-    with Sys_error message -> make_failure env message);
-  (* TODO: rest of io *)
-  Value.initialize value;
-  value
+      let text = input_line input in
+      let decoded =
+        Utf8.decode ~size:(String.length text)
+          ~get:(fun i -> Char.code text.[i])
+      in
+      match decoded.invalid with
+      | Some (_, _, message) -> Outcome.failure env message
+      | None when decoded.consumed <> String.length text ->
+          Outcome.failure env "incomplete UTF-8 input"
+      | None -> Builtins.make_string env text |> Outcome.success env
+    with
+    | End_of_file -> Outcome.failure env "end of input"
+    | Sys_error message -> Outcome.failure env message);
+  Outcome.finish io
 
-let env =
+let environment_control () =
   let value = Value.uninitialized () in
   Value.add_method value "run" 2 (fun _ values ->
     match values with
-    | [env; block] -> Value.get_method block "run" 0 env []
+    | [env; block] ->
+        Builtins.set_environment env;
+        let run = Value.get_method block "run" 0 in
+        (run [@tailcall]) env []
     | _ -> invalid_arg "wrong arity");
   Value.add_method value "bind" 2 (fun _ values ->
     match values with
-    | [env; value] -> Value.bind env value
+    | [env; value] ->
+        Value.bind ~before:(fun () -> Builtins.set_environment env) env value
     | _ -> invalid_arg "wrong arity");
-  Value.initialize value;
-  value
+  Outcome.finish value
 
-let extend =
-  let value = Value.uninitialized () in
-  let id _ = List.hd in
-  Value.add_method value "boolean" 1 id;
-  Value.add_method value "number"  1 id;
-  Value.add_method value "string"  1 id;
-  Value.add_method value "list"    1 id;
-  Value.initialize value;
-  value
+let from_sequence env sequence =
+  let values = Dynarray.create () in
+  let rec loop sequence =
+    let node = Runtime.resume (fun () ->
+      Value.get_method sequence "run" 0 env []) in
+    let condition = Runtime.resume (fun () ->
+      Value.get_method node "cons?" 0 env []) in
+    let branch body =
+      let block = Value.uninitialized () in
+      Value.add_method block "run" 0 (fun _ _ -> (body [@tailcall]) ());
+      Outcome.finish block
+    in
+    let cons = branch (fun () ->
+      let element = Runtime.resume (fun () ->
+        Value.get_method node "get" 0 env []) in
+      Dynarray.add_last values element;
+      let next = Runtime.resume (fun () ->
+        Value.get_method node "next" 0 env []) in
+      (loop [@tailcall]) next)
+    in
+    let nil = branch (fun () ->
+      Builtins.make_list env (Dynarray.to_array values))
+    in
+    (* Church dispatch executes a branch, rather than inspecting a boolean. *)
+    let chosen = Runtime.resume (fun () ->
+      Value.get_method condition "then-else" 2 env [cons; nil]) in
+    let run = Value.get_method chosen "run" 0 in
+    (run [@tailcall]) env []
+  in
+  loop sequence
 
-let core =
+let make_core () =
+  let extension = Value.uninitialized () in
+  List.iter (fun kind ->
+    Value.add_method extension kind 1 (fun _ args -> List.hd args))
+    ["boolean"; "number"; "string"; "list"];
+  Value.initialize extension;
+  let core = Value.uninitialized () in
+  Value.add_method core "extend" 0 (fun _ _ -> extension);
+  Value.add_method core "tag" 1 (fun _ args ->
+    let number = List.hd args |> Value.as_number in
+    let tag = Value.uninitialized () in
+    Value.set_number tag number;
+    Outcome.finish tag);
+  Value.add_method core "from-seq" 1 (fun env args ->
+    from_sequence env (List.hd args));
+  Outcome.finish core
+
+let box content =
+  let content = ref content in
   let value = Value.uninitialized () in
-  Value.add_method value "extend" 0 (fun _ _ -> extend);
-  Value.add_method value "tag" 1 (fun _ values ->
-    let value = Value.uninitialized () in
-    List.hd values |> Value.as_number |> Value.set_number value;
+  Value.add_method value "set" 1 (fun _ args ->
+    content := List.hd args;
     value);
-  (* TODO: from-seq *)
-  Value.initialize value;
-  value
+  Value.add_method value "get" 0 (fun _ _ -> !content);
+  Outcome.finish value
 
-let default =
+let array () =
+  let elements = Dynarray.create () in
   let value = Value.uninitialized () in
-  Value.add_method value "io"  0 (fun _ _ -> io);
-  (* TODO: fs *)
-  Value.add_method value "env" 0 (fun _ _ -> env);
-  Value.add_method value "eval" 1 (fun env values ->
+  let index arg =
+    let i = Builtins.int_of_value arg in
+    if i < 0 || i >= Dynarray.length elements then
+      Runtime.error ("index out of bounds: " ^ string_of_int i);
+    i
+  in
+  Value.add_method value "set" 2 (fun _ args ->
+    match args with
+    | [i; element] ->
+        Dynarray.set elements (index i) element;
+        value
+    | _ -> invalid_arg "wrong arity");
+  Value.add_method value "at" 1 (fun _ args ->
+    Dynarray.get elements (index (List.hd args)));
+  Value.add_method value "push" 1 (fun _ args ->
+    Dynarray.add_last elements (List.hd args);
+    value);
+  Value.add_method value "pop" 0 (fun _ _ ->
+    match Dynarray.pop_last_opt elements with
+    | Some element -> element
+    | None -> Runtime.error "attempt to pop empty array");
+  Value.add_method value "size" 0 (fun env _ ->
+    Builtins.make_number env (float (Dynarray.length elements)));
+  Outcome.finish value
+
+let make ?(filename = "<string>") ?(input = stdin) ?(output = stdout)
+    ?(error = stderr) () =
+  let value = Value.uninitialized () in
+  let constant name capability =
+    Value.add_method value name 0 (fun _ _ -> capability)
+  in
+  constant "io" (make_io ~input ~output ~error);
+  constant "fs" (Filesystem.make ());
+  constant "utf-8" (Encoding.make ());
+  constant "env" (environment_control ());
+  constant "core" (make_core ());
+  Value.add_method value "eval" 1 (fun env args ->
+    let source = List.hd args |> Builtins.string_of_value env in
+    let filename = Builtins.filename env "<eval>" in
     let lowered =
-      List.hd values |> string_of_value env |> Lexer.create |> Parser.parse
-      |> Lowerer.lower
+      Lexer.create ~filename source |> Parser.parse |> Lowerer.lower
     in
     Evaluator.eval lowered.scope_size env lowered.ir);
-  Value.add_method value "box" 1 (fun _ values ->
-    let box = List.hd values |> ref in
-    let value = Value.uninitialized () in
-    Value.add_method value "set" 1
-      (fun _ values -> box := List.hd values; value);
-    Value.add_method value "get" 0 (fun _ _ -> !box);
-    Value.initialize value;
-    value);
-  Value.add_method value "array" 0 (fun _ _ ->
-    let array = Dynarray.create () in
-    let value = Value.uninitialized () in
-    Value.add_method value "set" 2 (fun _ values ->
-      match values with
-      | [index; value] ->
-          let n = Builtins.int_of_value index in
-          if n < 0 || n >= Dynarray.length array then raise (Runtime.Error (
-            "index out of bounds " ^ Builtins.string_of_number (float n),
-            Position.zero));
-          Dynarray.set array n value;
-          value
-      | _ -> invalid_arg "wrong arity");
-    Value.add_method value "at" 1 (fun _ values ->
-      let n = List.hd values |> Builtins.int_of_value in
-      if n < 0 || n >= Dynarray.length array then raise (Runtime.Error (
-        "index out of bounds " ^ Builtins.string_of_number (float n),
-        Position.zero));
-      Dynarray.get array n);
-    Value.add_method value "push" 1 (fun _ values ->
-      List.hd values |> Dynarray.add_last array;
-      value);
-    Value.add_method value "pop" 0 (fun _ _ ->
-      match Dynarray.pop_last_opt array with
-      | Some value -> value
-      | None ->
-          raise (Runtime.Error ("attempt to pop empty array", Position.zero)));
-    Value.add_method value "size" 0
-      (fun env _ -> Dynarray.length array |> float |> Builtins.make_number env);
-    Value.initialize value;
-    value);
-  Value.add_method value "true"  0 (fun env _ -> Builtins.make_boolean env true);
-  Value.add_method value "false" 0
-    (fun env _ -> Builtins.make_boolean env false);
-  Value.add_method value "core"  0 (fun _ _ -> core);
-  Value.add_method value "exit" 1 (fun _ values ->
-    List.hd values |> Builtins.int_of_value |> exit);
-  Value.add_method value "crash" 1 (fun env values -> raise
-    (Runtime.Error (List.hd values |> string_of_value env, Position.zero)));
-  Value.initialize value;
-  value
+  Value.add_method value "filename" 0
+    (fun env _ -> Builtins.make_string env filename);
+  Value.add_method value "box" 1 (fun _ args -> box (List.hd args));
+  Value.add_method value "array" 0 (fun _ _ -> array ());
+  Value.add_method value "true" 0 (fun env _ -> Builtins.make_boolean env true);
+  Value.add_method value "false" 0 (fun env _ -> Builtins.make_boolean env false);
+  Value.add_method value "exit" 1 (fun _ args ->
+    List.hd args |> Builtins.int_of_value |> exit);
+  Value.add_method value "crash" 1 (fun env args ->
+    List.hd args |> Builtins.string_of_value env |> Runtime.error);
+  Outcome.finish value
+
+let default = make ()
