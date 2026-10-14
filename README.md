@@ -32,26 +32,26 @@ attract a lot of contributors, but is fine for now.
 
 Source files and their responsibilies:
 
-| Source              | Responsibility                          |
-|---------------------|-----------------------------------------|
-| `bin/main.ml`       | Entry point of the program              |
-| `lib/builtins.ml`   | Description of builtin types            |
-| `lib/env.ml`        | Description the default environment     |
-| `lib/encoding.ml`   | UTF-8 conversion and lazy remainders     |
-| `lib/filesystem.ml` | Byte-file and streaming capabilities    |
-| `lib/outcome.ml`    | Recoverable success/failure objects      |
-| `lib/utf8.ml`       | UTF-8 scalar validation and decoding     |
-| `lib/evaluator.ml`  | Evaluator for the IR                    |
-| `lib/expression.ml` | Description of the AST                  |
-| `lib/ir.ml`         | Description of the IR                   |
-| `lib/lexer.ml`      | String -> token stream lexer            |
-| `lib/lowerer.ml`    | AST -> IR lowerer                       |
-| `lib/parser.ml`     | Token stream -> AST parser              |
-| `lib/position.ml`   | Description of the source position type |
-| `lib/runtime.ml`    | Common runtime definitions              |
-| `lib/token.ml`      | Description of a token                  |
-| `lib/value.ml`      | Description of a runtime value          |
-| `test/*.ml`         | Automatic tests                         |
+| Source               | Responsibility                          |
+|----------------------|-----------------------------------------|
+| `bin/main.ml`        | Entry point of the program              |
+| `lib/builtins.ml`    | Description of builtin types            |
+| `lib/env.ml`         | Description the default environment     |
+| `lib/encoding.ml`    | UTF-8 conversion and lazy remainders    |
+| `lib/filesystem.ml`  | Byte-file and streaming capabilities    |
+| `lib/outcome.ml`     | Recoverable success/failure objects     |
+| `lib/utf8.ml`        | UTF-8 scalar validation and decoding    |
+| `lib/evaluator.ml`   | Evaluator for the IR                    |
+| `lib/expression.ml`  | Description of the AST                  |
+| `lib/ir.ml`          | Description of the IR                   |
+| `lib/lexer.ml`       | String -> token stream lexer            |
+| `lib/lowerer.ml`     | AST -> IR lowerer                       |
+| `lib/parser.ml`      | Token stream -> AST parser              |
+| `lib/position.ml`    | Description of the source position type |
+| `lib/runtime.ml`     | Common runtime definitions              |
+| `lib/token.ml`       | Description of a token                  |
+| `lib/value.ml`       | Description of a runtime value          |
+| `test/*.ml`          | Automatic tests                         |
 
 ## Language basics
 
@@ -70,8 +70,7 @@ and their exact output, alongside the existing interpreter tests.
 
 ## Environment and standard library
 
-The [native environment](doc/ENVIRONMENT.md) implements the interfaces from
-`TrOOPL specification-2.pdf`, sections 5.12 and 6.6: byte filesystem access,
+The native environment provides byte filesystem access,
 UTF-8 conversion, IO, dynamic environments, evaluation, mutable boxes/arrays,
 builtin extensions, filenames, exit, and crash.
 
@@ -80,10 +79,11 @@ Troopl. It supplies boolean control flow, string/list operations, text-file
 helpers, and module import using the environment-wrapper pattern.
 
 ```sh
-dune exec troopl -- stdlib/demo.tr
+dune exec troopl -- stdlib/init.tr
 ```
 
 Errors print `filename:line:column: category: message` to stderr and exit
 with status 1. Runtime filenames come from the active environment's
 `filename` method, with a source-filename fallback if it is missing or invalid.
 Position tracking uses bounded per-domain state and preserves guest tail calls.
+File-opening and reading errors report the filename without a source position.

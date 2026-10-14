@@ -1,0 +1,7 @@
+# Application loaded by stdlib/init.tr in the extended environment.
+(io print ("Hello" + ", " + "Troopl!"))
+(io print ((list range 1 6) fold {run A B (A + B)} 0 to-string))
+(io print ((false) then ["unused"] else-if [(true)] [
+  "lazy else-if"
+] else ["unused"]))
+(io print ("я🙂" reverse))

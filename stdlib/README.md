@@ -10,7 +10,7 @@ hooks, as in the environment-wrapper pattern.
 From the repository root:
 
 ```sh
-dune exec troopl -- stdlib/demo.tr
+dune exec troopl -- stdlib/init.tr
 ```
 
 It prints:
@@ -21,6 +21,10 @@ Hello, Troopl!
 lazy else-if
 🙂я
 ```
+
+`init.tr` loads the library and executes `main.tr` in the extended environment.
+Replace `main.tr` with application code; the loader can remain unchanged.
+Both paths are relative to the repository root.
 
 ## Load and use
 
