@@ -20,4 +20,4 @@
  (name troopl)
  (synopsis "A powerful minimal OO language with object capability system")
  (description "TrOOPL is a minimal object-oriented programming language with a purely functional core, where dependency injection, mutability, and capabilities like I/O and file system access are managed through explicitly passed and constructed environment objects.")
- (depends ocaml uucp))
+ (depends (ocaml (>= 5.3)) uucp))

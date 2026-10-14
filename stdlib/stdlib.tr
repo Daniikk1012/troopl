@@ -1,0 +1,224 @@
+# Standard-library factory. Loading this file creates no global bindings.
+# Call its extend method to build a capability-scoped English environment.
+Library {
+  failure Message {ok? (false) message (Message)}
+
+  index I Size (
+    I = (I floor) then-else [
+      I >= 0 then-else [
+        I < Size then-else [I] [(crash "index out of bounds")] run
+      ] [(crash "negative index")] run
+    ] [(crash "non-integer index")] run
+  )
+
+  range Start Stop (
+    Start <= Stop then-else [
+      core extend list {
+        size (Stop - Start)
+        at I (Start + (Library index I (Stop - Start)))
+      }
+    ] [(crash "invalid range")] run
+  )
+
+  sequence L I {
+    run (I < (L size) then-else [
+      {cons? (true) get (L at I) next (Library sequence L (I + 1))}
+    ] [{cons? (false)}] run)
+  }
+
+  fold L F I Acc (
+    I = (L size) then-else [Acc] [
+      Library fold L F (I + 1) (F run Acc (L at I))
+    ] run
+  )
+
+  each L F I (
+    I = (L size) then-else [{}] [
+      (F run (L at I))
+      Library each L F (I + 1)
+    ] run
+  )
+
+  filter-sequence L P I {run (Library filter-node L P I)}
+  filter-node L P I (
+    I = (L size) then-else [{cons? (false)}] [
+      Element (L at I)
+      P run Element then-else [
+        {
+          cons? (true)
+          get (Element)
+          next (Library filter-sequence L P (I + 1))
+        }
+      ] [Library filter-node L P (I + 1)] run
+    ] run
+  )
+
+  equal A B I (
+    I = (A size) then-else [(true)] [
+      (A at I) = (B at I) then-else
+        [Library equal A B (I + 1)] [(false)] run
+    ] run
+  )
+
+  concat A B {
+    size ((A size) + (B size))
+    at I (
+      N (Library index I ((A size) + (B size)))
+      N < (A size) then-else [A at N] [B at (N - (A size))] run
+    )
+  }
+
+  conditional Choose {
+    else No (Choose run No run)
+    else-if Test Yes (
+      Library conditional {
+        run No (Choose run [Test run then-else Yes No run])
+      }
+    )
+    end (Choose run [] run)
+  }
+
+  boolean X {
+    X
+    not (X then-else (false) (true))
+    and Y (X then-else Y (false))
+    or Y (X then-else (true) Y)
+    xor Y (X then-else (Y then-else (false) (true)) Y)
+    and-then B (X then-else B [(false)] run)
+    or-else B (X then-else [(true)] B run)
+    then Yes (Library conditional {run No (X then-else Yes No)})
+    to-string (X then-else "true" "false")
+  }
+
+  number X {
+    X
+    abs (X < 0 then-else [X -] [X] run)
+    min Y (X < Y then-else X Y)
+    max Y (X > Y then-else X Y)
+  }
+
+  list X (
+    Self {
+      X
+      is-empty (X size = 0)
+      + Y (core extend list (Library concat X Y))
+      map F (core extend list {
+        size (X size)
+        at I (F run (X at (Library index I (X size))))
+      })
+      filter P (core from-seq (Library filter-sequence X P 0))
+      fold F Seed (Library fold X F 0 Seed)
+      for-each F (Library each X F 0)
+      to-seq (Library sequence X 0)
+      strict (core from-seq (Self to-seq))
+    }
+    Self
+  )
+
+  string X (
+    Self {
+      (Library list X)
+      X
+      + Y (core extend string (Library concat X Y))
+      substring Start Stop (
+        Start = (Start floor) then-else [
+          Stop = (Stop floor) then-else [
+            Start >= 0 then-else [
+              Stop >= Start then-else [
+                Stop <= (X size) then-else [
+                  core extend string {
+                    size (Stop - Start)
+                    at I (X at (Start + (Library index I (Stop - Start))))
+                  }
+                ] [(crash "substring ends beyond string")] run
+              ] [(crash "substring ends before start")] run
+            ] [(crash "negative substring start")] run
+          ] [(crash "non-integer substring end")] run
+        ] [(crash "non-integer substring start")] run
+      )
+      reverse (core extend string {
+        size (X size)
+        at I (X at ((X size) - 1 - (Library index I (X size))))
+      })
+      equals Y ((X size) = (Y size) then-else
+        [Library equal X Y 0] [(false)] run)
+      to-string (Self)
+      strict (
+        Result (utf-8 to-string (utf-8 from-string X))
+        Result ok? then-else [Result] [(crash (Result message))] run
+      )
+    }
+    Self
+  )
+
+  read-text F (
+    Bytes (fs read F)
+    Bytes ok? then-else [
+      Text (utf-8 to-string Bytes)
+      Text ok? then-else [
+        Text remainder size = 0 then-else [Text] [
+          Library failure "incomplete UTF-8 file"
+        ] run
+      ] [Text] run
+    ] [Bytes] run
+  )
+
+  import E F (
+    Host ()
+    Source (Library read-text F)
+    Source ok? then-else [
+      Module-Env {E filename (F)}
+      Module (env run Module-Env [(Host eval Source)])
+      () env bind Module-Env Module
+    ] [(crash (Source message))] run
+  )
+
+  extend E (
+    Native-Core (E core)
+    Native-Extend (Native-Core extend)
+    Native-FS (E fs)
+    Extend {
+      Native-Extend
+      boolean X (Library boolean (Native-Extend boolean X))
+      number X (Library number (Native-Extend number X))
+      string X (Library string (Native-Extend string X))
+      list X (Library list (Native-Extend list X))
+    }
+    Core {Native-Core extend (Extend)}
+    Environment {
+      E
+      core (Core)
+      fs {
+        Native-FS
+        read-text F (Library read-text F)
+        write-text F S (Native-FS write F (utf-8 from-string S))
+      }
+      list {
+        range Start Stop (Library range Start Stop)
+        from L (core from-seq (Library sequence L 0))
+        from-minimal L (core extend list L)
+        of (
+          A (array)
+          Builder {
+            and X ((A push X) Builder)
+            end (core from-seq (Library sequence A 0))
+          }
+          Builder
+        )
+      }
+      string {
+        from-minimal S (core extend string S)
+        from S (
+          Result (utf-8 to-string (utf-8 from-string S))
+          Result ok? then-else [Result] [(crash (Result message))] run
+        )
+      }
+      import F (Library import () F)
+      import Module-Env F (Library import Module-Env F)
+    }
+    Environment
+  )
+
+  run B (env run (Library extend ()) B)
+}
+Library

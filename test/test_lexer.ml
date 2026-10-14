@@ -60,4 +60,10 @@ let () =
   test_fail "\"";
   test_fail "\"abc\"\"";
   test_fail "1a";
+  List.iter test_fail
+    ["#\255"; "\"a\255\""; "A\255"; "a\255"; "\226\130"];
+  test "#я🙂\n\"я🙂\"" [
+    String "я🙂", 8, 2, 1;
+    Eof,         16, 2, 5;
+  ];
   print_endline "test_lexer successful"

@@ -4,7 +4,7 @@ let read_file filename =
   In_channel.with_open_bin filename In_channel.input_all
 
 let string_of_value value =
-  let env = Env.default in
+  let env = (Env.make ()) in
   let size =
     Value.get_method value "size" 0 env [] |> Builtins.int_of_value
   in
@@ -58,7 +58,7 @@ let check filename kind expected stdout_expected =
       read_file ("../examples/" ^ filename)
       |> Lexer.create |> Parser.parse |> Lowerer.lower
     in
-    Evaluator.eval lowered.scope_size Env.default lowered.ir)
+    Evaluator.eval lowered.scope_size (Env.make ()) lowered.ir)
   in
   let actual = match kind with
     | "number" -> Value.as_number result |> Builtins.string_of_number

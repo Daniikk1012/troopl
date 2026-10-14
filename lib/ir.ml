@@ -6,8 +6,8 @@ type t =
   | Sequence            of t * t
   | Object              of entry list
   | Variable            of int
-  | Number              of float
-  | String              of string
+  | Number              of float * Position.t
+  | String              of string * Position.t
   | Environment
   | Call of { value : t; name : string; args : t list; pos : Position.t }
 
@@ -36,8 +36,10 @@ let rec to_string = function
   | Object entries ->
       "Object [" ^ String.concat "; " (List.map string_of_entry entries) ^ "]"
   | Variable i -> "Variable " ^ string_of_int i
-  | Number n -> "Number " ^ string_of_float n
-  | String s -> "String \"" ^ String.escaped s ^ "\""
+  | Number (n, pos) ->
+      "Number " ^ string_of_float n ^ " at " ^ Position.to_string pos
+  | String (s, pos) ->
+      "String \"" ^ String.escaped s ^ "\" at " ^ Position.to_string pos
   | Environment -> "Environment"
   | Call { value; name; args; pos } ->
       "Call (" ^ to_string value ^ ") " ^ name

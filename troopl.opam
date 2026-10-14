@@ -8,7 +8,7 @@ homepage: "https://github.com/Daniikk1012/troopl"
 bug-reports: "https://github.com/Daniikk1012/troopl/issues"
 depends: [
   "dune" {>= "3.24"}
-  "ocaml"
+  "ocaml" {>= "5.3"}
   "uucp"
   "odoc" {with-doc}
 ]

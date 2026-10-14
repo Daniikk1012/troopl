@@ -1,10 +1,16 @@
-type t = { offset : int; line : int; column : int }
+type t = {
+  offset : int;
+  line : int;
+  column : int;
+  filename : string option;
+}
 
-let zero = { offset = 0; line = 1; column = 1 }
+let zero = { offset = 0; line = 1; column = 1; filename = None }
+let with_filename filename pos = { pos with filename = Some filename }
 
 let next c pos =
   if c = '\n' then
-    { offset = pos.offset + 1; line = pos.line + 1; column = 1 }
+    { pos with offset = pos.offset + 1; line = pos.line + 1; column = 1 }
   else {
     pos with
     offset = pos.offset + 1;
@@ -13,3 +19,5 @@ let next c pos =
   }
 
 let to_string pos = string_of_int pos.line ^ ":" ^ string_of_int pos.column
+let describe pos =
+  Option.value pos.filename ~default:"<unknown>" ^ ":" ^ to_string pos
