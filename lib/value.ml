@@ -1,6 +1,6 @@
 type t = {
-  mutable number : float option;
-  methods : (string * int, t -> t list -> t) Hashtbl.t;
+  mutable number      : float option;
+  methods             : (string * int, t -> t list -> t) Hashtbl.t;
   mutable initialized : bool;
 }
 
@@ -43,6 +43,9 @@ let get_method value name arity =
         ("method " ^ name ^ "/" ^ string_of_int arity ^ " not found")
 
 let initialize value = value.initialized <- true
+
+let finish value = initialize value; value
+let empty () = finish (uninitialized ())
 
 let bind ?(before = fun () -> ()) env value =
   ensure_initialized value;

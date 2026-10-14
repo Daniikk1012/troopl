@@ -10,7 +10,7 @@ let remainder env source start =
       Runtime.error ("index out of bounds: " ^ string_of_int index);
     let index = Builtins.make_number env (float (start + index)) in
     Value.get_method source "at" 1 env [index]);
-  Builtins.extend env "list" (Outcome.finish view)
+  Builtins.extend env "list" (Value.finish view)
 
 let make () =
   let utf8 = Value.uninitialized () in
@@ -39,5 +39,5 @@ let make () =
         Value.add_methods value (Builtins.make_string env decoded.text);
         let suffix = remainder env source decoded.consumed in
         Value.add_method value "remainder" 0 (fun _ _ -> suffix);
-        Outcome.success env (Outcome.finish value));
-  Outcome.finish utf8
+        Outcome.success env (Value.finish value));
+  Value.finish utf8

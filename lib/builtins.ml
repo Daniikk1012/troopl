@@ -1,4 +1,4 @@
-let finish value = Value.initialize value; value
+let finish = Value.finish
 
 let extend env kind value =
   let core = Value.get_method env "core" 0 env [] in
@@ -41,7 +41,7 @@ let string_of_number number =
 
 let int_of_value value =
   let n = Value.as_number value in
-  if not (Float.is_finite n && Float.is_integer n)
+  if not (Float.is_integer n)
      || n < float min_int || n >= float max_int then
     Runtime.error ("expected a finite integer: " ^ string_of_number n);
   int_of_float n
@@ -82,10 +82,7 @@ let rec make_number env number =
      "<=", ( <= ); ">=", ( >= )];
   List.iter (fun (name, operation) ->
     Value.add_method value name 0
-      (fun env _ -> operation number |> make_number env);
-    (* Section 6.2 also documents these as operations on an argument. *)
-    Value.add_method value name 1 (fun env values ->
-      operation (List.hd values |> Value.as_number) |> make_number env))
+      (fun env _ -> operation number |> make_number env))
     ["floor", Float.floor; "ceil", Float.ceil; "trunc", Float.trunc];
   Value.add_method value "to-string" 0
     (fun env _ -> make_string env (string_of_number number));
@@ -97,7 +94,7 @@ and make_string env text =
     if i < String.length text then (
       let decoded = String.get_utf_8_uchar text i in
       if not (Uchar.utf_decode_is_valid decoded) then
-        Runtime.error ("invalid UTF-8 string at byte " ^ string_of_int i);
+        invalid_arg ("invalid UTF-8 string at byte " ^ string_of_int i);
       let code = Uchar.utf_decode_uchar decoded |> Uchar.to_int in
       Dynarray.add_last values (make_number env (float code));
       read (i + Uchar.utf_decode_length decoded))
@@ -115,7 +112,7 @@ and make_string env text =
   extend env "string" (finish value)
 
 let make_list env values =
-  let array = Array.copy values in
+  let array = values in
   let size = make_number env (float (Array.length array)) in
   let value = Value.uninitialized () in
   Value.add_method value "at" 1 (fun _ args ->
@@ -126,44 +123,19 @@ let make_list env values =
   Value.add_method value "size" 0 (fun _ _ -> size);
   extend env "list" (finish value)
 
-let read_string env value index_value =
+let string_of_value env value =
   let size = size_of_value env value in
   let at = Value.get_method value "at" 1 env in
   let buffer = Buffer.create (min size 4096) in
   for i = 0 to size - 1 do
     let element = Runtime.resume (fun () ->
-      at [index_value i]) in
+      at [make_number env (float i)]) in
     let code = int_of_value element in
     if not (Uchar.is_valid code) then
       Runtime.error ("invalid character code " ^ string_of_int code);
     Buffer.add_utf_8_uchar buffer (Uchar.of_int code)
   done;
   Buffer.contents buffer
-
-let string_of_value env value =
-  read_string env value (fun i -> make_number env (float i))
-
-let filename env fallback =
-  try
-    let value = Value.get_method env "filename" 0 env [] in
-    try string_of_value env value with _ ->
-      (* Diagnostics must still read a captured filename when core is absent.
-         These internal indices are bare numeric tags, not guest literals. *)
-      read_string env value (fun i ->
-        let tag = Value.uninitialized () in
-        Value.set_number tag (float i);
-        finish tag)
-  with _ -> fallback
-
-let set_environment env =
-  let fallback =
-    Option.value (Runtime.current ()).position.filename ~default:"<unknown>"
-  in
-  Runtime.set_environment (fun () -> filename env fallback)
-
-let locate env position =
-  let fallback = Option.value position.Position.filename ~default:"<unknown>" in
-  Runtime.set_location position (fun () -> filename env fallback)
 
 let bytes_of_value env value =
   let size = size_of_value env value in

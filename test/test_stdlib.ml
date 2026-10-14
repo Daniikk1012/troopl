@@ -16,7 +16,7 @@ let read path = In_channel.with_open_bin path In_channel.input_all
 let n env i = Builtins.make_number env (float i)
 let s env text = Builtins.make_string env text
 let truth env value =
-  let yes = Outcome.empty () and no = Outcome.empty () in
+  let yes = Value.empty () and no = Value.empty () in
   call env value "then-else" [yes; no] == yes
 
 let () =

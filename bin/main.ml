@@ -11,7 +11,6 @@ let () =
     prerr_endline ("usage: " ^ program ^ " <filename>");
     exit 1);
   let filename = Sys.argv.(1) in
-  let start = Position.with_filename filename Position.zero in
   try
     let source = In_channel.with_open_bin filename In_channel.input_all in
     let lowered =
@@ -20,8 +19,10 @@ let () =
     Evaluator.eval lowered.scope_size (Env.make ~filename ()) lowered.ir
     |> ignore
   with
-  | Lexer.Error (message, pos) -> report "LEXER ERROR" message pos
-  | Parser.Error (message, pos) -> report "PARSER ERROR" message pos
+  | Lexer.Error   (message, pos) -> report "LEXER ERROR" message pos
+  | Parser.Error  (message, pos) -> report "PARSER ERROR" message pos
   | Lowerer.Error (message, pos) -> report "LOWERING ERROR" message pos
   | Runtime.Error (message, pos) -> report "RUNTIME ERROR" message pos
-  | Sys_error message -> report "IO ERROR" message start
+  | Sys_error message ->
+      prerr_endline (filename ^ ": IO ERROR: " ^ message);
+      exit 1

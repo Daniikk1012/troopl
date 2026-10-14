@@ -5,7 +5,7 @@ let check label condition =
   incr checks;
   if not condition then failwith label
 
-let eval ?(env = Env.default) ?(filename = "test.tr") source =
+let eval ?(env = (Env.make ())) ?(filename = "test.tr") source =
   let lowered =
     Lexer.create ~filename source |> Parser.parse |> Lowerer.lower
   in
@@ -16,7 +16,7 @@ let call env value name args =
 let number = Value.as_number
 let string env value = Builtins.string_of_value env value
 let choose env value =
-  let yes = Outcome.empty () and no = Outcome.empty () in
+  let yes = Value.empty () and no = Value.empty () in
   call env value "then-else" [yes; no] == yes
 let ok env value = choose env (call env value "ok?" [])
 let n env value = Builtins.make_number env (float value)
@@ -27,7 +27,7 @@ let at env value i = call env value "at" [n env i]
 let size env value = call env value "size" [] |> Builtins.int_of_value
 let expect_number source expected =
   check source (number (eval source) = expected)
-let expect_error ?(env = Env.default) source filename line column =
+let expect_error ?(env = (Env.make ())) source filename line column =
   try ignore (eval ~env source); failwith ("expected error: " ^ source)
   with Runtime.Error (_, pos) ->
     check "error filename" (pos.filename = Some filename);
@@ -39,11 +39,11 @@ let with_file f =
   Fun.protect ~finally:(fun () -> Sys.remove path) (fun () -> f path)
 
 let () =
-  let env = Env.default in
+  let env = (Env.make ()) in
   let core = call env env "core" [] in
   let extension = call env core "extend" [] in
   List.iter (fun kind ->
-    let value = Outcome.empty () in
+    let value = Value.empty () in
     check ("identity " ^ kind)
       (call env extension kind [value] == value))
     ["boolean"; "number"; "string"; "list"];
@@ -55,9 +55,13 @@ let () =
   expect_number "12 -" (-12.);
   expect_number "7- mod 3-" 2.;
   expect_number "1 mod 100000000000000000000" 1.;
-  expect_number "0 floor 2.8" 2.;
-  expect_number "0 ceil 2.2" 3.;
-  expect_number "0 trunc 2.8-" (-2.);
+  expect_number "2.8 floor" 2.;
+  expect_number "2.2 ceil" 3.;
+  expect_number "2.8- trunc" (-2.);
+  List.iter (fun name ->
+    try ignore (eval ("0 " ^ name ^ " 2"));
+        failwith "rounding accepted an argument"
+    with Runtime.Error _ -> ()) ["floor"; "ceil"; "trunc"];
   List.iter (fun value ->
     let source = Builtins.string_of_number value in
     check ("numeric spelling " ^ source) (number (eval source) = value))
@@ -208,7 +212,10 @@ let () =
   expect_error ~env:(eval "{() filename {}}")
     "\n{} missing" "test.tr" 2 4;
   expect_error ~env:(eval "F \"virtual.tr\" {filename (F)}")
-    "\n1" "virtual.tr" 2 1;
+    "\n1" "test.tr" 2 1;
+  expect_error
+    "C (core) Ext (C extend) F \"virtual.tr\" E {() core {C extend {Ext number N {N marker (N)}}} filename {size (F size) at I (F at (I marker))}} (env run E [{} missing])"
+    "virtual.tr" 1 156;
   expect_error "\n(io print {size {} at I 65})" "<string>" 2 5;
   expect_error "\n(io print {size 1 at I ({} nope)})" "<string>" 2 28;
   expect_error "\n(crash \"boom\")" "<string>" 2 2;
@@ -221,11 +228,22 @@ let () =
        failwith "eval should fail lowering"
    with Lowerer.Error (_, pos) ->
      check "eval compile filename" (pos.filename = Some "<string>"));
-  (try ignore (Lexer.create ~filename:"bad.tr" "#\255");
+  (try ignore (Lexer.create ~filename:"bad.tr" "#\255" |> Lexer.next_token);
        failwith "invalid UTF-8 comment should fail"
    with Lexer.Error (_, pos) ->
      check "UTF-8 source location"
        (pos.filename = Some "bad.tr" && pos.column = 2));
+  (try ignore (Builtins.make_string env "\255");
+       failwith "invalid native string should fail"
+   with Invalid_argument _ -> ());
+  (try ignore (Evaluator.eval 1 env (Ir.Variable 0));
+       failwith "uninitialized slot should fail"
+   with Invalid_argument _ -> ());
+  let pos = Position.next '\n' Position.zero in
+  check "number IR prints position"
+    (Ir.to_string (Ir.Number (1., pos)) = "Number 1. at 2:1");
+  check "string IR prints position"
+    (Ir.to_string (Ir.String ("x", pos)) = "String \"x\" at 2:1");
   check "context does not leak after failure"
     (number (eval "17") = 17.);
   Printf.printf "%d environment/diagnostic checks passed\n%!" !checks

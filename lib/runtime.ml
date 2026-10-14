@@ -15,6 +15,7 @@ let initial = {
 }
 let context = Domain.DLS.new_key (fun () -> initial)
 let current () = Domain.DLS.get context
+let position () = (current ()).position
 let set_location position filename =
   let previous = current () in
   Domain.DLS.set context { position; filename; reporting = previous.reporting }

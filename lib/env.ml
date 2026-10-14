@@ -12,7 +12,7 @@ let make_io ~input ~output ~error =
     Value.add_method value "raw-print" 1 (print false);
     value
   in
-  let err = writer error |> Outcome.finish in
+  let err = writer error |> Value.finish in
   let io = writer output in
   Value.add_method io "error" 0 (fun _ _ -> err);
   Value.add_method io "read-line" 0 (fun env _ ->
@@ -30,23 +30,23 @@ let make_io ~input ~output ~error =
     with
     | End_of_file -> Outcome.failure env "end of input"
     | Sys_error message -> Outcome.failure env message);
-  Outcome.finish io
+  Value.finish io
 
 let environment_control () =
   let value = Value.uninitialized () in
   Value.add_method value "run" 2 (fun _ values ->
     match values with
     | [env; block] ->
-        Builtins.set_environment env;
+        Diagnostics.set_environment env;
         let run = Value.get_method block "run" 0 in
         (run [@tailcall]) env []
     | _ -> invalid_arg "wrong arity");
   Value.add_method value "bind" 2 (fun _ values ->
     match values with
     | [env; value] ->
-        Value.bind ~before:(fun () -> Builtins.set_environment env) env value
+        Value.bind ~before:(fun () -> Diagnostics.set_environment env) env value
     | _ -> invalid_arg "wrong arity");
-  Outcome.finish value
+  Value.finish value
 
 let from_sequence env sequence =
   let values = Dynarray.create () in
@@ -58,7 +58,7 @@ let from_sequence env sequence =
     let branch body =
       let block = Value.uninitialized () in
       Value.add_method block "run" 0 (fun _ _ -> (body [@tailcall]) ());
-      Outcome.finish block
+      Value.finish block
     in
     let cons = branch (fun () ->
       let element = Runtime.resume (fun () ->
@@ -91,10 +91,10 @@ let make_core () =
     let number = List.hd args |> Value.as_number in
     let tag = Value.uninitialized () in
     Value.set_number tag number;
-    Outcome.finish tag);
+    Value.finish tag);
   Value.add_method core "from-seq" 1 (fun env args ->
     from_sequence env (List.hd args));
-  Outcome.finish core
+  Value.finish core
 
 let box content =
   let content = ref content in
@@ -103,7 +103,7 @@ let box content =
     content := List.hd args;
     value);
   Value.add_method value "get" 0 (fun _ _ -> !content);
-  Outcome.finish value
+  Value.finish value
 
 let array () =
   let elements = Dynarray.create () in
@@ -131,7 +131,7 @@ let array () =
     | None -> Runtime.error "attempt to pop empty array");
   Value.add_method value "size" 0 (fun env _ ->
     Builtins.make_number env (float (Dynarray.length elements)));
-  Outcome.finish value
+  Value.finish value
 
 let make ?(filename = "<string>") ?(input = stdin) ?(output = stdout)
     ?(error = stderr) () =
@@ -146,7 +146,7 @@ let make ?(filename = "<string>") ?(input = stdin) ?(output = stdout)
   constant "core" (make_core ());
   Value.add_method value "eval" 1 (fun env args ->
     let source = List.hd args |> Builtins.string_of_value env in
-    let filename = Builtins.filename env "<eval>" in
+    let filename = Diagnostics.filename env "<eval>" in
     let lowered =
       Lexer.create ~filename source |> Parser.parse |> Lowerer.lower
     in
@@ -161,6 +161,4 @@ let make ?(filename = "<string>") ?(input = stdin) ?(output = stdout)
     List.hd args |> Builtins.int_of_value |> exit);
   Value.add_method value "crash" 1 (fun env args ->
     List.hd args |> Builtins.string_of_value env |> Runtime.error);
-  Outcome.finish value
-
-let default = make ()
+  Value.finish value

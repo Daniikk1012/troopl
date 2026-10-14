@@ -15,8 +15,8 @@ let read_handle channel =
     else Outcome.attempt env (fun () ->
       closed := true;
       close_in channel;
-      Outcome.empty ()));
-  Outcome.finish handle
+      Value.empty ()));
+  Value.finish handle
 
 let write_handle channel =
   let closed = ref false in
@@ -33,8 +33,8 @@ let write_handle channel =
     else Outcome.attempt env (fun () ->
       closed := true;
       close_out channel;
-      Outcome.empty ()));
-  Outcome.finish handle
+      Value.empty ()));
+  Value.finish handle
 
 let make () =
   let fs = Value.uninitialized () in
@@ -53,7 +53,7 @@ let make () =
         Outcome.attempt env (fun () ->
           Out_channel.with_open_bin path (fun channel ->
             output_bytes channel bytes);
-          Outcome.empty ())
+          Value.empty ())
     | _ -> invalid_arg "wrong arity");
   Value.add_method fs "open-read" 1 (fun env args ->
     let path = List.hd args |> Builtins.string_of_value env in
@@ -61,4 +61,4 @@ let make () =
   Value.add_method fs "open-write" 1 (fun env args ->
     let path = List.hd args |> Builtins.string_of_value env in
     Outcome.attempt env (fun () -> open_out_bin path |> write_handle));
-  Outcome.finish fs
+  Value.finish fs

@@ -1,4 +1,8 @@
-type t = { input : string; mutable pos : Position.t }
+type t = {
+  input : string;
+  mutable pos : Position.t;
+  mutable validated_until : int;
+}
 
 exception Error of string * Position.t
 
@@ -7,20 +11,7 @@ let create ?filename input =
     | None -> Position.zero
     | Some name -> Position.with_filename name Position.zero
   in
-  let rec validate i position =
-    if i < String.length input then (
-      let decoded = String.get_utf_8_uchar input i in
-      if not (Uchar.utf_decode_is_valid decoded) then
-        raise (Error ("invalid UTF-8", position));
-      let count = Uchar.utf_decode_length decoded in
-      let next = ref position in
-      for j = 0 to count - 1 do
-        next := Position.next input.[i + j] !next
-      done;
-      validate (i + count) !next)
-  in
-  validate 0 pos;
-  { input; pos }
+  { input; pos; validated_until = 0 }
 
 let get_utf_8_uchar lexer =
   let d = String.get_utf_8_uchar lexer.input lexer.pos.offset in
@@ -29,8 +20,16 @@ let get_utf_8_uchar lexer =
   else raise (Error ("invalid UTF-8", lexer.pos))
 
 let get_char lexer =
-  if lexer.pos.offset < String.length lexer.input then
-    Some lexer.input.[lexer.pos.offset]
+  if lexer.pos.offset < String.length lexer.input then (
+    (* Validate each scalar once as its bytes are consumed, including string,
+       comment and identifier tails. Continuations share this validated span. *)
+    if lexer.pos.offset >= lexer.validated_until then (
+      let decoded = String.get_utf_8_uchar lexer.input lexer.pos.offset in
+      if not (Uchar.utf_decode_is_valid decoded) then
+        raise (Error ("invalid UTF-8", lexer.pos));
+      lexer.validated_until <-
+        lexer.pos.offset + Uchar.utf_decode_length decoded);
+    Some lexer.input.[lexer.pos.offset])
   else None
 
 let advance lexer =

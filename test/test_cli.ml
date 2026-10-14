@@ -74,5 +74,7 @@ let () =
   let status, _, error = run missing in
   check "missing file status" (status = Unix.WEXITED 1);
   check "missing file diagnostic"
-    (contains error (missing ^ ":1:1: IO ERROR"));
+    (contains error (missing ^ ": IO ERROR"));
+  check "file IO error has no invented position"
+    (not (contains error ":1:1:"));
   print_endline "CLI filename, position, IO, exit and crash checks passed"

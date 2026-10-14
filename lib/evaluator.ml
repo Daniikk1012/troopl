@@ -17,17 +17,17 @@ let rec eval_ir scope env : Ir.t -> _ = function
   | Variable i ->
       (match scope.(i) with
        | Some value -> value
-       | None -> Runtime.error "uninitialized variable slot")
-  | Number (n, pos) -> Builtins.locate env pos; Builtins.make_number env n
-  | String (s, pos) -> Builtins.locate env pos; Builtins.make_string env s
+       | None -> invalid_arg "uninitialized variable slot")
+  | Number (n, pos) -> Diagnostics.locate env pos; Builtins.make_number env n
+  | String (s, pos) -> Diagnostics.locate env pos; Builtins.make_string env s
   | Environment -> env
   | Call { value; name; args; pos } ->
       let value = eval_ir scope env value in
-      Builtins.locate env pos;
+      Diagnostics.locate env pos;
       (* Validate before evaluating arguments, as required by section 5.9. *)
       Value.ensure_initialized value;
       let args = List.map (eval_ir scope env) args in
-      Builtins.locate env pos;
+      Diagnostics.locate env pos;
       let method_ = Value.get_method value name (List.length args) in
       (method_ [@tailcall]) env args
 
@@ -48,12 +48,12 @@ and fill_with_entries env scope value entries =
         Value.add_method value name (List.length args) run
     | Inclusion { value = inclusion; pos } ->
         let inclusion = eval_ir scope env inclusion in
-        Builtins.locate env pos;
+        Diagnostics.locate env pos;
         Value.add_methods value inclusion)
     entries;
   Value.initialize value
 
 let eval scope_size env ir =
   Runtime.protect (fun () ->
-    Builtins.locate env Position.zero;
+    Diagnostics.locate env Position.zero;
     eval_ir (Array.make scope_size None) env ir)

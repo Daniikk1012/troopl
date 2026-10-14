@@ -36,8 +36,10 @@ let rec to_string = function
   | Object entries ->
       "Object [" ^ String.concat "; " (List.map string_of_entry entries) ^ "]"
   | Variable i -> "Variable " ^ string_of_int i
-  | Number (n, _) -> "Number " ^ string_of_float n
-  | String (s, _) -> "String \"" ^ String.escaped s ^ "\""
+  | Number (n, pos) ->
+      "Number " ^ string_of_float n ^ " at " ^ Position.to_string pos
+  | String (s, pos) ->
+      "String \"" ^ String.escaped s ^ "\" at " ^ Position.to_string pos
   | Environment -> "Environment"
   | Call { value; name; args; pos } ->
       "Call (" ^ to_string value ^ ") " ^ name
