@@ -68,6 +68,9 @@ dune exec troopl -- examples/example_01.tr
 Every example prints its result. `dune runtest` checks all 50 returned values
 and their exact output, alongside the existing interpreter tests.
 
+For complete understanding of the language, see
+[the specification](SPECIFICATION.pdf).
+
 ## Environment and standard library
 
 The native environment provides byte filesystem access,
