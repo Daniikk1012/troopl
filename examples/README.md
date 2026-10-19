@@ -1,5 +1,9 @@
 # Runnable Troopl examples
 
+For a larger application, see the [interactive calculator](calculator/README.md).
+It has its own parser, variables, functions, recoverable errors, history,
+session save/load, filesystem inspection, and explicit process execution.
+
 Run from the repository root:
 
 ```sh

@@ -41,6 +41,7 @@ Source files and their responsibilies:
 | `lib/filesystem.ml`  | Byte-file and streaming capabilities    |
 | `lib/outcome.ml`     | Recoverable success/failure objects     |
 | `lib/utf8.ml`        | UTF-8 scalar validation and decoding    |
+| `lib/system.ml`      | Process execution, time, and exit       |
 | `lib/evaluator.ml`   | Evaluator for the IR                    |
 | `lib/expression.ml`  | Description of the AST                  |
 | `lib/ir.ml`          | Description of the IR                   |
@@ -73,9 +74,33 @@ For complete understanding of the language, see
 
 ## Environment and standard library
 
-The native environment provides byte filesystem access,
-UTF-8 conversion, IO, dynamic environments, evaluation, mutable boxes/arrays,
-builtin extensions, filenames, exit, and crash.
+The native environment implements the Version 0.1 interfaces: lossless string
+file IO, binary file handles, metadata and directory operations, process
+execution, time, UTF-8 conversion, IO with explicit flushing, dynamic
+environments, evaluation, boxes/arrays, builtin extensions, and diagnostics.
+Process exit is `(system exit N)`; there is no top-level `exit` method.
+
+`fs read` returns a string and `fs write` accepts a string and returns a
+filesystem result. Binary handle reads/writes still use byte lists; read
+counts must be positive. Files and host output preserve undecodable bytes as
+negative string elements. Use `utf-8 to-bytes` / `from-bytes` for lossless
+conversion, or `from-string` / `to-string` for strict UTF-8 conversion.
+
+`system run` takes a nonempty list of command arguments, not a shell command.
+It captures stdout/stderr separately; a nonzero exit is still a completed
+result with `ok?` true. Launch failures return `ok?` false. The overload with
+one argument supplies empty stdin without constructing a Troopl string.
+Capture uses temporary binary files, removed after the call, avoiding pipe
+deadlocks. Abnormal signal termination reports exit code 128. Output is
+materialized after the process exits; this is not a streaming API.
+
+Filesystem metadata follows symlinks. Missing paths return successful metadata
+with false predicates and zero timestamps/size; other OS failures are
+recoverable errors. Directory listings contain sorted entry names, not full
+paths. `remove` unlinks a file/link; `remove-dir` removes an empty directory,
+never a tree. Rename replacement behavior follows the host OS. Working-directory
+changes affect the whole process. Native capabilities are authority to perform
+these operations, not a security sandbox by themselves.
 
 The [English standard library](stdlib/README.md) is opt-in and written in
 Troopl. It supplies boolean control flow, string/list operations, text-file
@@ -90,3 +115,17 @@ with status 1. Runtime filenames come from the active environment's
 `filename` method, with a source-filename fallback if it is missing or invalid.
 Position tracking uses bounded per-domain state and preserves guest tail calls.
 File-opening and reading errors report the filename without a source position.
+
+## Calculator application
+
+The [calculator](examples/calculator/README.md) is a larger application written
+in Troopl: an expression parser, variables, functions, history, session files,
+filesystem inspection, and explicit command execution.
+
+```sh
+dune exec troopl -- examples/calculator/main.tr
+```
+
+The calculator parses its own input language; it does not evaluate user input
+as Troopl source. The test suite covers the original 50 examples, Version 0.1
+capabilities, and calculator arithmetic, error recovery, persistence, and CLI IO.
