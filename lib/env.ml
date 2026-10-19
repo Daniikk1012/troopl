@@ -1,4 +1,7 @@
 let make_io ~input ~output ~error =
+  set_binary_mode_in input true;
+  set_binary_mode_out output true;
+  set_binary_mode_out error true;
   let writer channel =
     let value = Value.uninitialized () in
     let print newline env args =
@@ -10,6 +13,8 @@ let make_io ~input ~output ~error =
     in
     Value.add_method value "print" 1 (print true);
     Value.add_method value "raw-print" 1 (print false);
+    Value.add_method value "flush" 0 (fun env _ ->
+      Outcome.attempt env (fun () -> flush channel; value));
     value
   in
   let err = writer error |> Value.finish in
@@ -18,15 +23,7 @@ let make_io ~input ~output ~error =
   Value.add_method io "read-line" 0 (fun env _ ->
     try
       let text = input_line input in
-      let decoded =
-        Utf8.decode ~size:(String.length text)
-          ~get:(fun i -> Char.code text.[i])
-      in
-      match decoded.invalid with
-      | Some (_, _, message) -> Outcome.failure env message
-      | None when decoded.consumed <> String.length text ->
-          Outcome.failure env "incomplete UTF-8 input"
-      | None -> Builtins.make_string env text |> Outcome.success env
+      Builtins.make_byte_string env text |> Outcome.success env
     with
     | End_of_file -> Outcome.failure env "end of input"
     | Sys_error message -> Outcome.failure env message);
@@ -141,6 +138,7 @@ let make ?(filename = "<string>") ?(input = stdin) ?(output = stdout)
   in
   constant "io" (make_io ~input ~output ~error);
   constant "fs" (Filesystem.make ());
+  constant "system" (System.make ());
   constant "utf-8" (Encoding.make ());
   constant "env" (environment_control ());
   constant "core" (make_core ());
@@ -152,13 +150,11 @@ let make ?(filename = "<string>") ?(input = stdin) ?(output = stdout)
     in
     Evaluator.eval lowered.scope_size env lowered.ir);
   Value.add_method value "filename" 0
-    (fun env _ -> Builtins.make_string env filename);
+    (fun env _ -> Builtins.make_byte_string env filename);
   Value.add_method value "box" 1 (fun _ args -> box (List.hd args));
   Value.add_method value "array" 0 (fun _ _ -> array ());
   Value.add_method value "true" 0 (fun env _ -> Builtins.make_boolean env true);
   Value.add_method value "false" 0 (fun env _ -> Builtins.make_boolean env false);
-  Value.add_method value "exit" 1 (fun _ args ->
-    List.hd args |> Builtins.int_of_value |> exit);
   Value.add_method value "crash" 1 (fun env args ->
     List.hd args |> Builtins.string_of_value env |> Runtime.error);
   Value.finish value

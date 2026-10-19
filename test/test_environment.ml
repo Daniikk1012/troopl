@@ -122,9 +122,9 @@ let () =
       (try ignore (call env result "size" []); false
        with Runtime.Error _ -> true))
     [([0x80], 0, 0x80); ([0xc0; 0x80], 0, 0xc0);
-     ([0xe0; 0x80], 1, 0x80); ([0xed; 0xa0; 0x80], 1, 0xa0);
-     ([0xf4; 0x90; 0x80; 0x80], 1, 0x90);
-     ([65; 0xe2; 40; 0xa1], 2, 40); ([256], 0, 256)];
+     ([0xe0; 0x80], 0, 0xe0); ([0xed; 0xa0; 0x80], 0, 0xed);
+     ([0xf4; 0x90; 0x80; 0x80], 0, 0xf4);
+     ([65; 0xe2; 40; 0xa1], 1, 0xe2); ([256], 0, 256)];
   let array = eval "(array push 65 push 226 push 130)" in
   let partial = call env utf8 "to-string" [array] in
   let suffix = call env partial "remainder" [] in
@@ -133,16 +133,18 @@ let () =
   let fs = call env env "fs" [] in
   with_file (fun path ->
     let path_value = s env path in
-    let result = call env fs "write" [path_value; encoded] in
+    let result = call env fs "write" [path_value; original] in
     check "whole-file write" (ok env result);
     let result = call env fs "read" [path_value] in
     check "whole-file read" (ok env result);
     check "binary bytes preserved"
-      (Builtins.bytes_of_value env result = Builtins.bytes_of_value env encoded);
+      (string env result = string env original);
     let reader = call env fs "open-read" [path_value] in
     check "open-read success" (ok env reader);
     check "read at most N" (size env (call env reader "read" [n env 1]) = 1);
-    check "read zero" (size env (call env reader "read" [n env 0]) = 0);
+    check "read zero rejected"
+      (try ignore (call env reader "read" [n env 0]); false
+       with Runtime.Error _ -> true);
     ignore (call env reader "read" [n env 999]);
     let eof = call env reader "read" [n env 10] in
     check "EOF is empty successful list" (ok env eof && size env eof = 0);
@@ -160,14 +162,14 @@ let () =
       (not (ok env (call env fs "open-write" [s env (path ^ "/child")])));
     let result = call env fs "read" [path_value] in
     check "binary stream preserves NUL/CR/LF/255"
-      (Builtins.bytes_of_value env result = Bytes.of_string "\000\r\n\255");
+      (string env result = "\000\r\n\255");
     let missing = s env (path ^ ".missing") in
     let failed = call env fs "read" [missing] in
     check "OS read failure is a value" (not (ok env failed));
     check "read failure has no at"
       (try ignore (call env failed "at" [n env 0]); false
        with Runtime.Error _ -> true);
-    (try ignore (call env fs "write" [path_value; bytes env [256]]);
+    (try ignore (call env fs "write" [path_value; bytes env [0x110000]]);
          failwith "invalid byte did not crash"
      with Runtime.Error _ -> ());
     check "invalid write did not truncate file"

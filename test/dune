@@ -1,5 +1,12 @@
 (tests
  (names test_troopl test_position test_lexer test_parser test_lowerer
-        test_evaluator test_examples test_environment test_stdlib test_cli)
+        test_evaluator test_examples test_environment test_stdlib test_cli
+        test_specification)
+ (modules (:standard \ process_child))
  (libraries troopl unix)
- (deps (source_tree ../examples) (source_tree ../stdlib) ../bin/main.exe))
+ (deps (source_tree ../examples) (source_tree ../stdlib) ../bin/main.exe
+       process_child.exe))
+
+(executable
+ (name process_child)
+ (modules process_child))
