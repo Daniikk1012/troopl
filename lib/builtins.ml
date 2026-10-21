@@ -89,18 +89,24 @@ let rec make_number env number =
   extend env "number" (finish value)
 
 and make_string env text =
-  let values = Dynarray.create () in
+  let codes = Dynarray.create () in
   let rec read i =
     if i < String.length text then (
       let decoded = String.get_utf_8_uchar text i in
       if not (Uchar.utf_decode_is_valid decoded) then
         invalid_arg ("invalid UTF-8 string at byte " ^ string_of_int i);
       let code = Uchar.utf_decode_uchar decoded |> Uchar.to_int in
-      Dynarray.add_last values (make_number env (float code));
+      Dynarray.add_last codes code;
       read (i + Uchar.utf_decode_length decoded))
   in
   read 0;
-  let array = Dynarray.to_array values in
+  make_string_codes env (Dynarray.to_array codes)
+
+and make_byte_string env text =
+  make_string_codes env (Utf8.lossless text)
+
+and make_string_codes env codes =
+  let array = Array.map (fun code -> make_number env (float code)) codes in
   let size = make_number env (float (Array.length array)) in
   let value = Value.uninitialized () in
   Value.add_method value "at" 1 (fun _ args ->
@@ -123,7 +129,7 @@ let make_list env values =
   Value.add_method value "size" 0 (fun _ _ -> size);
   extend env "list" (finish value)
 
-let string_of_value env value =
+let string_of_value ?(lossless = true) env value =
   let size = size_of_value env value in
   let at = Value.get_method value "at" 1 env in
   let buffer = Buffer.create (min size 4096) in
@@ -131,9 +137,11 @@ let string_of_value env value =
     let element = Runtime.resume (fun () ->
       at [make_number env (float i)]) in
     let code = int_of_value element in
-    if not (Uchar.is_valid code) then
-      Runtime.error ("invalid character code " ^ string_of_int code);
-    Buffer.add_utf_8_uchar buffer (Uchar.of_int code)
+    if lossless && code >= -255 && code < 0 then
+      Buffer.add_char buffer (Char.chr (-code))
+    else if Uchar.is_valid code then
+      Buffer.add_utf_8_uchar buffer (Uchar.of_int code)
+    else Runtime.error ("invalid character code " ^ string_of_int code)
   done;
   Buffer.contents buffer
 

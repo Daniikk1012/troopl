@@ -15,8 +15,15 @@ let remainder env source start =
 let make () =
   let utf8 = Value.uninitialized () in
   Value.add_method utf8 "from-string" 1 (fun env args ->
+    List.hd args |> Builtins.string_of_value ~lossless:false env
+    |> Bytes.of_string
+    |> Builtins.list_of_bytes env);
+  Value.add_method utf8 "to-bytes" 1 (fun env args ->
     List.hd args |> Builtins.string_of_value env |> Bytes.of_string
     |> Builtins.list_of_bytes env);
+  Value.add_method utf8 "from-bytes" 1 (fun env args ->
+    List.hd args |> Builtins.bytes_of_value env |> Bytes.to_string
+    |> Builtins.make_byte_string env);
   Value.add_method utf8 "to-string" 1 (fun env args ->
     let source = List.hd args in
     let size = Builtins.size_of_value env source in

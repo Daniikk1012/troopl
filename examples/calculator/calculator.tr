@@ -1,0 +1,285 @@
+# A calculator implemented in Troopl, not by evaluating input as Troopl code.
+# This module requires the English standard-library environment.
+Calculator {
+  failure Message Column {ok? (false) message (Message) column (Column)}
+  format Number (
+    Number < 0 then-else ["-" + (Number - to-string)] [Number to-string] run
+  )
+
+  digit C ((C >= 48) and (C <= 57))
+  letter C (
+    ((C >= 65) and (C <= 90)) or
+      ((C >= 97) and (C <= 122)) or (C = 95)
+  )
+  space C ((C = 32) or (C = 9) or (C = 10) or (C = 13))
+
+  find Entries Name I (
+    I = (Entries size) then-else [1-] [
+      (Entries at I name) equals Name then-else [I] [
+        Calculator find Entries Name (I + 1)
+      ] run
+    ] run
+  )
+
+  parser Text Variables Previous (
+    Position (box 0)
+    Problem (box {failed? (false)})
+    P {
+      current (
+        (Position get) < (Text size) then-else
+          [Text at (Position get)] [1-] run
+      )
+      advance (Position set ((Position get) + 1))
+      skip (
+        Calculator space (P current) then-else [
+          (P advance)
+          P skip
+        ] [] run
+      )
+      peek ((P skip) P current)
+      accept Code (
+        (P peek) = Code then-else [(P advance) (true)] [(false)] run
+      )
+      fail Message (
+        ((Problem get failed?) then-else [] [
+          Problem set {
+            failed? (true)
+            message (Message)
+            column ((Position get) + 1)
+          }
+        ] run)
+        0
+      )
+      require Code (
+        P accept Code then-else [] [P fail "expected closing parenthesis"] run
+      )
+      digits Acc (
+        Calculator digit (P current) then-else [
+          C (P current)
+          (P advance)
+          P digits (Acc * 10 + (C - 48))
+        ] [Acc] run
+      )
+      fraction Acc Scale (
+        Calculator digit (P current) then-else [
+          C (P current)
+          (P advance)
+          P fraction (Acc + ((C - 48) / Scale)) (Scale * 10)
+        ] [Acc] run
+      )
+      number (
+        Whole (P digits 0)
+        (P current) = 46 then-else [
+          (P advance)
+          P fraction Whole 10
+        ] [Whole] run
+      )
+      name-end Start (
+        ((Calculator letter (P current)) or (Calculator digit (P current)))
+          then-else [(P advance) P name-end Start]
+            [Text substring Start (Position get) strict] run
+      )
+      name (P name-end (Position get))
+      lookup Name (
+        Name equals "ans" then [Previous]
+        else-if [Name equals "pi"] [3.141592653589793]
+        else-if [Name equals "e"] [2.718281828459045]
+        else [
+          I (Calculator find Variables Name 0)
+          I >= 0 then-else [Variables at I value]
+            [P fail ("unknown variable: " + Name)] run
+        ]
+      )
+      function-one Name A (
+        Name equals "abs" then [A abs]
+        else-if [Name equals "sqrt"] [
+          A >= 0 then-else [A ^ 0.5] [P fail "sqrt expects a nonnegative value"] run
+        ]
+        else-if [Name equals "floor"] [A floor]
+        else-if [Name equals "ceil"] [A ceil]
+        else-if [Name equals "trunc"] [A trunc]
+        else [P fail ("unknown one-argument function: " + Name)]
+      )
+      function-two Name A B (
+        Name equals "min" then [A min B]
+        else-if [Name equals "max"] [A max B]
+        else-if [Name equals "pow"] [A ^ B]
+        else [P fail ("unknown two-argument function: " + Name)]
+      )
+      primary (
+        P accept 40 then [
+          Value (P expression)
+          (P require 41)
+          Value
+        ]
+        else-if [Calculator digit (P peek)] [P number]
+        else-if [Calculator letter (P peek)] [
+          Name (P name)
+          P accept 40 then-else [
+            A (P expression)
+            P accept 44 then-else [
+              B (P expression)
+              (P require 41)
+              P function-two Name A B
+            ] [
+              (P require 41)
+              P function-one Name A
+            ] run
+          ] [P lookup Name] run
+        ]
+        else [P fail "expected a number, variable, function, or parenthesis"]
+      )
+      power (
+        Base (P primary)
+        P accept 94 then-else [Base ^ (P unary)] [Base] run
+      )
+      unary (
+        P accept 45 then [(P unary) -]
+        else-if [P accept 43] [P unary]
+        else [P power]
+      )
+      product-tail Left (
+        (Problem get failed?) then-else [Left] [
+          P accept 42 then [P product-tail (Left * (P unary))]
+          else-if [P accept 47] [
+            Right (P unary)
+            Right = 0 then-else [P fail "division by zero"] [
+              P product-tail (Left / Right)
+            ] run
+          ]
+          else-if [P accept 37] [
+            Right (P unary)
+            Right = 0 then-else [P fail "modulo by zero"] [
+              P product-tail (Left mod Right)
+            ] run
+          ]
+          else [Left]
+        ] run
+      )
+      product (P product-tail (P unary))
+      sum-tail Left (
+        (Problem get failed?) then-else [Left] [
+          P accept 43 then [P sum-tail (Left + (P product))]
+          else-if [P accept 45] [P sum-tail (Left - (P product))]
+          else [Left]
+        ] run
+      )
+      expression (P sum-tail (P product))
+      run (
+        (P skip)
+        Start (Position get)
+        Binding (box "")
+        (Calculator letter (P current) then-else [
+          Name (P name)
+          P accept 61 then-else [Binding set Name] [Position set Start] run
+        ] [] run)
+        Value (P expression)
+        ((P peek) <> 1- then-else [P fail "unexpected token"] [] run)
+        (Problem get failed?) then-else [
+          Calculator failure (Problem get message) (Problem get column)
+        ] [
+          {ok? (true) value (Value) binding (Binding get)}
+        ] run
+      )
+    }
+    P
+  )
+
+  trim-left Text I (
+    I < (Text size) then-else [
+      Calculator space (Text at I) then-else
+        [Calculator trim-left Text (I + 1)] [I] run
+    ] [I] run
+  )
+  trim-right Text I (
+    I > 0 then-else [
+      Calculator space (Text at (I - 1)) then-else
+        [Calculator trim-right Text (I - 1)] [I] run
+    ] [I] run
+  )
+  trim Text (
+    Start (Calculator trim-left Text 0)
+    Stop (Calculator trim-right Text (Text size))
+    Start < Stop then-else [Text substring Start Stop strict] [""] run
+  )
+  join-lines Lines I Text (
+    I = (Lines size) then-else [Text strict] [
+      Calculator join-lines Lines (I + 1) (Text + (Lines at I) + "
+")
+    ] run
+  )
+  lines Text Start I Result (
+    I = (Text size) then-else [
+      (Result push (Text substring Start I strict))
+      (list from Result)
+    ] [
+      (Text at I) = 10 then-else [
+        (Result push (Text substring Start I strict))
+        Calculator lines Text (I + 1) (I + 1) Result
+      ] [Calculator lines Text Start (I + 1) Result] run
+    ] run
+  )
+
+  new (
+    Variables (array)
+    History (array)
+    Previous (box 0)
+    Session {
+      calculate Line (
+        Input (Calculator trim Line)
+        R (Calculator parser Line Variables (Previous get) run)
+        R ok? then-else [
+          Name (R binding)
+          ((Name equals "ans") or (Name equals "pi") or (Name equals "e"))
+            then-else [Calculator failure "cannot assign to a constant" 1] [
+              (Name size > 0 then-else [
+                Entry {name (Name) value (R value)}
+                I (Calculator find Variables Name 0)
+                I >= 0 then-else [Variables set I Entry]
+                  [Variables push Entry] run
+              ] [] run)
+              (Previous set (R value))
+              (History push Input)
+              R
+            ] run
+        ] [R] run
+      )
+      variables (list from Variables)
+      history (list from History)
+      previous (Previous get)
+      clear (
+        (Session clear-array Variables)
+        (Session clear-array History)
+        Previous set 0
+      )
+      clear-array A (
+        A size > 0 then-else [(A pop) Session clear-array A] [] run
+      )
+      save Path (fs write Path (Calculator join-lines History 0 ""))
+      load Path (
+        Source (fs read-text Path)
+        Source ok? then-else [
+          Lines (Calculator lines Source 0 0 (array))
+          Session replay Lines 0 0
+        ] [Source] run
+      )
+      replay Lines I Count (
+        I = (Lines size) then-else [{ok? (true) count (Count)}] [
+          Line (Calculator trim (Lines at I))
+          Line size = 0 then-else [Session replay Lines (I + 1) Count] [
+            R (Session calculate Line)
+            R ok? then-else [Session replay Lines (I + 1) (Count + 1)] [
+              {
+                R
+                line (I + 1)
+                message ("line " + (I + 1 to-string) + ": " + (R message))
+              }
+            ] run
+          ] run
+        ] run
+      )
+    }
+    Session
+  )
+}
+Calculator

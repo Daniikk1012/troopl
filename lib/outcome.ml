@@ -10,7 +10,7 @@ let success env source =
 let failure ?(fields = []) env message =
   let result = Value.uninitialized () in
   let no = Builtins.make_boolean env false in
-  let message = Builtins.make_string env message in
+  let message = Builtins.make_byte_string env message in
   Value.add_method result "ok?" 0 (fun _ _ -> no);
   Value.add_method result "message" 0 (fun _ _ -> message);
   List.iter (fun (name, value) ->
@@ -18,4 +18,10 @@ let failure ?(fields = []) env message =
   Value.finish result
 
 let attempt env f =
-  try success env (f ()) with Sys_error message -> failure env message
+  try success env (f ()) with
+  | Sys_error message -> failure env message
+  | Unix.Unix_error (error, operation, argument) ->
+      let message = operation ^ ": " ^ Unix.error_message error in
+      let message = if argument = "" then message else
+        message ^ " (" ^ argument ^ ")" in
+      failure env message

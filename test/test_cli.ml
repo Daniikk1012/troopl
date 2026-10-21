@@ -61,7 +61,7 @@ let () =
     check "CLI success" (status = Unix.WEXITED 0);
     check "CLI stdout" (output = "works\n");
     check "CLI quiet stderr" (error = ""));
-  with_source "(exit 7)" (fun filename ->
+  with_source "(system exit 7)" (fun filename ->
     let status, _, error = run filename in
     check "exit capability" (status = Unix.WEXITED 7);
     check "exit quiet stderr" (error = ""));

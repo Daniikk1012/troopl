@@ -1,0 +1,38 @@
+let () =
+  if Array.length Sys.argv = 1 then print_endline "child-ready" else
+  match Sys.argv.(1) with
+  | "echo" ->
+      let input = In_channel.input_all stdin in
+      output_string stdout ("out:" ^ input ^ "\255");
+      output_string stderr "error\254"
+  | "args" ->
+      for i = 2 to Array.length Sys.argv - 1 do
+        output_string stdout Sys.argv.(i);
+        output_char stdout '\n'
+      done
+  | "empty" ->
+      if In_channel.input_all stdin <> "" then exit 9
+  | "flood" ->
+      output_string stdout (String.make 70000 'a');
+      output_string stderr (String.make 70000 'b');
+      flush stdout;
+      flush stderr;
+      In_channel.input_all stdin |> String.length |> Printf.printf "%d"
+  | "exit" -> exit 7
+  | "early" ->
+      (* Exit without reading stdin; the parent must tolerate a broken pipe. *)
+      output_string stdout "early\255";
+      output_string stderr "closed\254"
+  | "duplex" ->
+      let bytes = Bytes.create 257 in
+      let rec loop () =
+        let count = input stdin bytes 0 (Bytes.length bytes) in
+        if count > 0 then (
+          output stdout bytes 0 count;
+          output stderr bytes 0 count;
+          flush stdout;
+          flush stderr;
+          loop ())
+      in
+      loop ()
+  | _ -> exit 2

@@ -41,6 +41,7 @@ Source files and their responsibilies:
 | `lib/filesystem.ml`  | Byte-file and streaming capabilities    |
 | `lib/outcome.ml`     | Recoverable success/failure objects     |
 | `lib/utf8.ml`        | UTF-8 scalar validation and decoding    |
+| `lib/system.ml`      | Process execution, time, and exit       |
 | `lib/evaluator.ml`   | Evaluator for the IR                    |
 | `lib/expression.ml`  | Description of the AST                  |
 | `lib/ir.ml`          | Description of the IR                   |
@@ -73,9 +74,16 @@ For complete understanding of the language, see
 
 ## Environment and standard library
 
-The native environment provides byte filesystem access,
-UTF-8 conversion, IO, dynamic environments, evaluation, mutable boxes/arrays,
-builtin extensions, filenames, exit, and crash.
+Native interfaces are described in the specification. Implementation details:
+
+- Process commands are argument vectors, without an implicit shell. Signal
+  termination reports exit code 128.
+- Process IO uses nonblocking pipes with `select` on Unix/Cygwin. Native
+  Windows uses concurrent pipe readers because OCaml 5.3 only supports
+  socket nonblocking mode there. Neither path creates temporary files.
+  Captured output is materialized in memory, not streamed to Troopl.
+- Directory entries are sorted by byte order. Rename replacement behavior
+  follows the host OS; working-directory changes affect the whole process.
 
 The [English standard library](stdlib/README.md) is opt-in and written in
 Troopl. It supplies boolean control flow, string/list operations, text-file
@@ -90,3 +98,17 @@ with status 1. Runtime filenames come from the active environment's
 `filename` method, with a source-filename fallback if it is missing or invalid.
 Position tracking uses bounded per-domain state and preserves guest tail calls.
 File-opening and reading errors report the filename without a source position.
+
+## Calculator application
+
+The [calculator](examples/calculator/README.md) is a larger application written
+in Troopl: an expression parser, variables, functions, history, session files,
+filesystem inspection, and explicit command execution.
+
+```sh
+dune exec troopl -- examples/calculator/main.tr
+```
+
+The calculator parses its own input language; it does not evaluate user input
+as Troopl source. The test suite covers the original 50 examples, Version 0.1
+capabilities, and calculator arithmetic, error recovery, persistence, and CLI IO.

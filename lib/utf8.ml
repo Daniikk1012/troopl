@@ -42,9 +42,26 @@ let decode ~size ~get =
               else
                 let byte = get (i + j) in
                 let lower, upper = if j = 1 then low, high else 0x80, 0xbf in
-                if byte < lower || byte > upper then invalid (i + j) byte
+                if byte < lower || byte > upper then invalid i first
                 else continuation (j + 1) (byte :: bytes)
             in
             continuation 1 [first]
   in
   loop 0
+
+(** Decode valid scalars, preserving each undecodable byte as its negation. *)
+let lossless text =
+  let codes = Dynarray.create () in
+  let rec loop i =
+    if i < String.length text then (
+      let decoded = String.get_utf_8_uchar text i in
+      if Uchar.utf_decode_is_valid decoded then (
+        Dynarray.add_last codes
+          (Uchar.to_int (Uchar.utf_decode_uchar decoded));
+        loop (i + Uchar.utf_decode_length decoded))
+      else (
+        Dynarray.add_last codes (-Char.code text.[i]);
+        loop (i + 1)))
+  in
+  loop 0;
+  Dynarray.to_array codes
