@@ -1,4 +1,4 @@
 (library
  (name troopl)
- (libraries uucp unix)
+ (libraries uucp unix threads)
  (flags (:standard -w +51 -warn-error +51)))

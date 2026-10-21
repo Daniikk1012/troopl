@@ -19,4 +19,20 @@ let () =
       flush stderr;
       In_channel.input_all stdin |> String.length |> Printf.printf "%d"
   | "exit" -> exit 7
+  | "early" ->
+      (* Exit without reading stdin; the parent must tolerate a broken pipe. *)
+      output_string stdout "early\255";
+      output_string stderr "closed\254"
+  | "duplex" ->
+      let bytes = Bytes.create 257 in
+      let rec loop () =
+        let count = input stdin bytes 0 (Bytes.length bytes) in
+        if count > 0 then (
+          output stdout bytes 0 count;
+          output stderr bytes 0 count;
+          flush stdout;
+          flush stderr;
+          loop ())
+      in
+      loop ()
   | _ -> exit 2

@@ -171,6 +171,37 @@ let () =
     (text env (call env result "stdout" []) = String.make 70000 'a' ^ "100000");
   check "large process stderr"
     (text env (call env result "stderr" []) = String.make 70000 'b');
+  List.iter (fun system ->
+    let mask = if Sys.win32 then [] else Unix.sigprocmask Unix.SIG_BLOCK [] in
+    let input = s env (String.make 100000 'x' ^ "\255") in
+    let result = call env system "run" [argv "duplex"; input] in
+    check "duplex process success" (ok env result);
+    List.iter (fun stream ->
+      check "duplex pipe exact bytes"
+        (text env (call env result stream []) = text env input))
+      ["stdout"; "stderr"];
+    let result = call env system "run" [argv "early"; input] in
+    check "early exit succeeds" (ok env result);
+    check "early exit stdout retained"
+      (text env (call env result "stdout" []) = "early\255");
+    check "early exit stderr retained"
+      (text env (call env result "stderr" []) = "closed\254");
+    if not Sys.win32 then
+      check "closed stdin preserves caller signal mask"
+        (Unix.sigprocmask Unix.SIG_BLOCK [] = mask);
+    let result = call env system "run" [argv "flood"; input] in
+    check "both pipe backends drain full stdout before stdin"
+      (text env (call env result "stdout" [])
+       = String.make 70000 'a' ^ "100001");
+    check "both pipe backends drain full stderr before stdin"
+      (text env (call env result "stderr" []) = String.make 70000 'b');
+    let result = call env system "run" [argv "empty"] in
+    check "both pipe backends send EOF for empty stdin"
+      (ok env result && Value.as_number (call env result "exit-code" []) = 0.);
+    check "both pipe backends clean up a launch failure"
+      (not (ok env (call env system "run" [list env [s env
+        (executable ^ ".missing")]]))))
+    [system; System_threaded.make ()];
   check "missing command is recoverable"
     (not (ok env (call env system "run" [list env [s env
       (executable ^ ".missing")]])));
