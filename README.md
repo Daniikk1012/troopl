@@ -74,33 +74,16 @@ For complete understanding of the language, see
 
 ## Environment and standard library
 
-The native environment implements the Version 0.1 interfaces: lossless string
-file IO, binary file handles, metadata and directory operations, process
-execution, time, UTF-8 conversion, IO with explicit flushing, dynamic
-environments, evaluation, boxes/arrays, builtin extensions, and diagnostics.
-Process exit is `(system exit N)`; there is no top-level `exit` method.
+Native interfaces are described in the specification. Implementation details:
 
-`fs read` returns a string and `fs write` accepts a string and returns a
-filesystem result. Binary handle reads/writes still use byte lists; read
-counts must be positive. Files and host output preserve undecodable bytes as
-negative string elements. Use `utf-8 to-bytes` / `from-bytes` for lossless
-conversion, or `from-string` / `to-string` for strict UTF-8 conversion.
-
-`system run` takes a nonempty list of command arguments, not a shell command.
-It captures stdout/stderr separately; a nonzero exit is still a completed
-result with `ok?` true. Launch failures return `ok?` false. The overload with
-one argument supplies empty stdin without constructing a Troopl string.
-Capture uses temporary binary files, removed after the call, avoiding pipe
-deadlocks. Abnormal signal termination reports exit code 128. Output is
-materialized after the process exits; this is not a streaming API.
-
-Filesystem metadata follows symlinks. Missing paths return successful metadata
-with false predicates and zero timestamps/size; other OS failures are
-recoverable errors. Directory listings contain sorted entry names, not full
-paths. `remove` unlinks a file/link; `remove-dir` removes an empty directory,
-never a tree. Rename replacement behavior follows the host OS. Working-directory
-changes affect the whole process. Native capabilities are authority to perform
-these operations, not a security sandbox by themselves.
+- Process commands are argument vectors, without an implicit shell. Signal
+  termination reports exit code 128.
+- Process IO uses nonblocking pipes with `select` on Unix/Cygwin. Native
+  Windows uses concurrent pipe readers because OCaml 5.3 only supports
+  socket nonblocking mode there. Neither path creates temporary files.
+  Captured output is materialized in memory, not streamed to Troopl.
+- Directory entries are sorted by byte order. Rename replacement behavior
+  follows the host OS; working-directory changes affect the whole process.
 
 The [English standard library](stdlib/README.md) is opt-in and written in
 Troopl. It supplies boolean control flow, string/list operations, text-file
