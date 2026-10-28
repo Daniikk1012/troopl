@@ -1,4 +1,9 @@
 type t
+type number_layout
+val create_number_layout :
+  (Selector.t * (float -> t -> t list -> t)) array -> number_layout
+val number_from_layout : number_layout -> float -> t
+val invoke_id : t -> Selector.t -> t -> t list -> t
 
 val uninitialized      : unit -> t
 val set_number         : t -> float -> unit

@@ -92,25 +92,28 @@ let make_boolean env bool =
   extend env "boolean" (finish value)
 
 let rec make_number env number =
-  let value = Value.uninitialized () in
-  Value.set_number value number;
-  List.iter (fun (selector, operation) ->
-    Value.add_method_id value selector (fun env values ->
-      operation number (List.hd values |> Value.as_number)
-      |> make_number env))
-    arithmetic;
-  Value.add_method_id value Native_selectors.id_negate_0 (fun env _ -> make_number env (-. number));
-  List.iter (fun (selector, compare) ->
-    Value.add_method_id value selector (fun env values ->
-      compare number (List.hd values |> Value.as_number) |> make_boolean env))
-    comparisons;
-  List.iter (fun (selector, operation) ->
-    Value.add_method_id value selector
-      (fun env _ -> operation number |> make_number env))
-    rounding;
-  Value.add_method_id value Native_selectors.id_to_string_0
-    (fun env _ -> make_string env (string_of_number number));
-  extend env "number" (finish value)
+  Value.number_from_layout (Lazy.force number_layout) number
+  |> extend env "number"
+
+and number_layout = lazy (
+  let binary = List.map (fun (selector, operation) ->
+    selector, (fun number env args ->
+      make_number env (operation number (Value.as_number (List.hd args)))))
+    arithmetic in
+  let compare = List.map (fun (selector, operation) ->
+    selector, (fun number env args ->
+      make_boolean env (operation number (Value.as_number (List.hd args)))))
+    comparisons in
+  let round = List.map (fun (selector, operation) ->
+    selector, (fun number env _ -> make_number env (operation number)))
+    rounding in
+  let other = [
+    Native_selectors.id_negate_0,
+      (fun number env _ -> make_number env (-. number));
+    Native_selectors.id_to_string_0,
+      (fun number env _ -> make_string env (string_of_number number))
+  ] in
+  Value.create_number_layout (Array.of_list (binary @ compare @ round @ other)))
 
 and make_string env text =
   let codes = Dynarray.create () in
