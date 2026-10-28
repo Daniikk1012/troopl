@@ -106,11 +106,12 @@ Library {
         size (X size)
         at I (F run (X at (Library index I (X size))))
       })
-      filter P (core from-seq (Library filter-sequence X P 0))
+      filter P (core extend list
+        (core from-seq (Library filter-sequence X P 0)))
       fold F Seed (Library fold X F 0 Seed)
       for-each F (Library each X F 0)
       to-seq (Library sequence X 0)
-      strict (core from-seq (Self to-seq))
+      strict (core extend list (core from-seq (Self to-seq)))
     }
     Self
   )
@@ -143,24 +144,27 @@ Library {
       equals Y ((X size) = (Y size) then-else
         [Library equal X Y 0] [(false)] run)
       to-string (Self)
-      strict (
-        Result (utf-8 to-string (utf-8 from-string X))
-        Result ok? then-else [Result] [(crash (Result message))] run
-      )
+      strict (utf-8 from-bytes (utf-8 to-bytes X))
     }
     Self
   )
 
+  text-result Text I Offset (
+    I = (Text size) then-else [Text] [
+      Code (Text at I)
+      Code >= 0 then-else [
+        Width (Code < 128 then-else 1 (Code < 2048 then-else 2
+          (Code < 65536 then-else 3 4)))
+        Library text-result Text (I + 1) (Offset + Width)
+      ] [
+        {(Library failure "invalid UTF-8 file") index (Offset) byte (Code -)}
+      ] run
+    ] run
+  )
+
   read-text F (
-    Bytes (fs read F)
-    Bytes ok? then-else [
-      Text (utf-8 to-string Bytes)
-      Text ok? then-else [
-        Text remainder size = 0 then-else [Text] [
-          Library failure "incomplete UTF-8 file"
-        ] run
-      ] [Text] run
-    ] [Bytes] run
+    Text (fs read F)
+    Text ok? then-else [Library text-result Text 0 0] [Text] run
   )
 
   import E F (
@@ -191,27 +195,24 @@ Library {
       fs {
         Native-FS
         read-text F (Library read-text F)
-        write-text F S (Native-FS write F (utf-8 from-string S))
+        write-text F S (Native-FS write F S)
       }
       list {
         range Start Stop (Library range Start Stop)
-        from L (core from-seq (Library sequence L 0))
+        from L (core extend list (core from-seq (Library sequence L 0)))
         from-minimal L (core extend list L)
         of (
           A (array)
           Builder {
             and X ((A push X) Builder)
-            end (core from-seq (Library sequence A 0))
+            end (core extend list (core from-seq (Library sequence A 0)))
           }
           Builder
         )
       }
       string {
         from-minimal S (core extend string S)
-        from S (
-          Result (utf-8 to-string (utf-8 from-string S))
-          Result ok? then-else [Result] [(crash (Result message))] run
-        )
+        from S (utf-8 from-bytes (utf-8 to-bytes S))
       }
       import F (Library import () F)
       import Module-Env F (Library import Module-Env F)

@@ -55,7 +55,8 @@ let rec lower_expr lowerer (expr : Expression.t) =
   | Call { value; name; args } ->
       let value = lower_expr lowerer value in
       let args  = List.map (lower_expr lowerer) args in
-      Call { value; name; args; pos = expr.pos }
+      Call { value; name; selector = Selector.intern name (List.length args);
+        args; pos = expr.pos }
 
 and lower_entry lowerer entry =
   match entry.kind with
@@ -85,10 +86,11 @@ and lower_entry lowerer entry =
   | Inclusion value ->
       Inclusion { value = lower_expr lowerer value; pos = entry.pos }
 
-let lower expr =
+let lower ?(optimize = true) expr =
   let lowerer = create () in
   let ir = lower_expr lowerer expr in
   Hashtbl.iter
     (fun s (i, p) -> raise (Error ("unknown variable \"" ^ s ^ "\"", p)))
     lowerer.map;
+  let ir = if optimize then Capture_lowering.lower lowerer.index ir else ir in
   { ir; scope_size = lowerer.index }

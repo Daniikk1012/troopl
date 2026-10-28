@@ -1,6 +1,6 @@
 type t = {
   mutable number      : float option;
-  methods             : (string * int, t -> t list -> t) Hashtbl.t;
+  methods             : (Selector.t, t -> t list -> t) Hashtbl.t;
   mutable initialized : bool;
 }
 
@@ -23,9 +23,12 @@ let as_number value =
   | Some n -> n
   | None -> Runtime.error "object has no numeric representation"
 
-let add_method value name arity body =
+let add_method_id value selector body =
   assert (not value.initialized);
-  Hashtbl.replace value.methods (name, arity) body
+  Hashtbl.replace value.methods selector body
+
+let add_method value name arity body =
+  add_method_id value (Selector.intern name arity) body
 
 let add_methods into from =
   assert (not into.initialized);
@@ -34,13 +37,16 @@ let add_methods into from =
   Option.iter (set_number into) from.number;
   Hashtbl.iter (Hashtbl.replace into.methods) from.methods
 
-let get_method value name arity =
+let get_method_id value selector =
   ensure_initialized value;
-  match Hashtbl.find_opt value.methods (name, arity) with
+  match Hashtbl.find_opt value.methods selector with
   | Some f -> f
   | None ->
       Runtime.error
-        ("method " ^ name ^ "/" ^ string_of_int arity ^ " not found")
+        ("method " ^ Selector.describe selector ^ " not found")
+
+let get_method value name arity =
+  get_method_id value (Selector.intern name arity)
 
 let initialize value = value.initialized <- true
 
@@ -65,6 +71,6 @@ let to_string value =
       (Option.map (fun s -> string_of_float s ^ "; ") value.number)
   ^ "methods = ["
   ^ (Hashtbl.to_seq_keys value.methods
-    |> Seq.map (fun (s, n) -> s ^ "/" ^ string_of_int n) |> List.of_seq
+    |> Seq.map Selector.describe |> List.of_seq
     |> String.concat "; ")
   ^ "]; " ^ (if value.initialized then "" else "not ") ^ "initialized }"
