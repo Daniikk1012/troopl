@@ -1,0 +1,7 @@
+implementation,hook,units,median_seconds,allocated_bytes
+production,pure-identity,100000,0.117475,373600096
+production,pure-constant,100000,0.105756,370400096
+production,fresh-decoration-fallback,100000,0.168926,490400096
+pure-hook-prototype,pure-identity,100000,0.102792,365600096
+pure-hook-prototype,pure-constant,100000,0.101616,361600096
+pure-hook-prototype,fresh-decoration-fallback,100000,0.163789,490400096
