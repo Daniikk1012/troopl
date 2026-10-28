@@ -38,7 +38,23 @@ let rec eval_ir locals captured env : Ir.t -> _ = function
 
 (* This factory receives capture values, never the parent's local frame.
    In particular, a zero-capture method cannot accidentally retain that frame. *)
-and make_method captured args scope_size body env values =
+and make_method selector captured args scope_size body =
+  match Pure_hook.prove selector args body with
+  | Pure_hook.CapturedValue index ->
+      let result = read captured.(index) in
+      let arity = List.length args in
+      (fun _ values ->
+        if List.length values <> arity then invalid_arg "wrong method arity";
+        result)
+  | Pure_hook.Argument index ->
+      let arity = List.length args in
+      (fun _ values ->
+        if List.length values <> arity then invalid_arg "wrong method arity";
+        List.nth values index)
+  | Pure_hook.Unknown ->
+      run_method captured args scope_size body
+
+and run_method captured args scope_size body env values =
   let locals = if scope_size = 0 then [||] else Array.make scope_size None in
   List.iter2
     (fun value index ->
@@ -55,7 +71,7 @@ and fill_with_entries env locals captured value entries =
           | Ir.CaptureValues sources ->
               Array.map (location locals captured) sources
         in
-        let run = make_method captures args scope_size body in
+        let run = make_method selector captures args scope_size body in
         Value.add_method_id value selector run
     | Ir.Method _ ->
         invalid_arg "uncompiled method in executable IR"
