@@ -30,53 +30,7 @@ let write_pipe fd input offset count =
               ignore (Thread.wait_signal [Sys.sigpipe]);
             raise error)
 
-(* Drain both outputs while feeding stdin, rather than waiting on one stream.
-   Each ready descriptor gets at most one chunk per turn to keep things fair. *)
-let poll close stdin stdout stderr input =
-  List.iter Unix.set_nonblock [stdin; stdout; stderr];
-  let output = Buffer.create 4096 and error = Buffer.create 4096 in
-  let readers = ref [stdout, output; stderr, error] in
-  let writer = ref (Some stdin) and offset = ref 0 in
-  let finish_input () = close stdin; writer := None in
-  if input = "" then finish_input ();
-  let bytes = Bytes.create 16384 in
-  let rec loop () =
-    if !readers <> [] || Option.is_some !writer then (
-      let readable = List.map fst !readers in
-      let writable = Option.to_list !writer in
-      let ready_read, ready_write, _ =
-        try Unix.select readable writable [] (-1.) with
-        | Unix.Unix_error (Unix.EINTR, _, _) -> [], [], []
-      in
-      List.iter (fun (fd, buffer) ->
-        if List.mem fd ready_read then
-          try
-            let count = Unix.read fd bytes 0 (Bytes.length bytes) in
-            if count = 0 then (
-              close fd;
-              readers := List.filter (fun (other, _) -> other <> fd) !readers)
-            else Buffer.add_subbytes buffer bytes 0 count
-          with Unix.Unix_error
-            ((Unix.EAGAIN | Unix.EWOULDBLOCK | Unix.EINTR), _, _) -> ())
-        !readers;
-      (match !writer with
-       | Some fd when List.mem fd ready_write ->
-           (try
-              let count = min 16384 (String.length input - !offset) in
-              let written = write_pipe fd input !offset count in
-              offset := !offset + written;
-              if !offset = String.length input then finish_input ()
-            with
-            | Unix.Unix_error (Unix.EPIPE, _, _) -> finish_input ()
-            | Unix.Unix_error
-                ((Unix.EAGAIN | Unix.EWOULDBLOCK | Unix.EINTR), _, _) -> ())
-       | _ -> ());
-      (loop [@tailcall]) ())
-  in
-  loop ();
-  Buffer.contents output, Buffer.contents error
-
-(* Native Windows cannot make anonymous pipes nonblocking through Unix.
+(* Use the same pipe implementation on every platform.
    Reader threads release the OCaml runtime during IO; the calling thread can
    feed stdin without either child's output pipe filling up and deadlocking.
    Workers only touch host bytes, never Troopl values or diagnostic state. *)
@@ -160,9 +114,7 @@ let capture argv input =
       child := Some pid;
       List.iter close [stdin_read; stdout_write; stderr_write];
       let output, error =
-        if Sys.win32 then
-          threaded join start close stdin_write stdout_read stderr_read input
-        else poll close stdin_write stdout_read stderr_read input
+        threaded join start close stdin_write stdout_read stderr_read input
       in
       let status = wait pid in
       child := None;

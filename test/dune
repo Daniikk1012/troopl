@@ -10,14 +10,3 @@
 (executable
  (name process_child)
  (modules process_child))
-
-; Compile the same private implementation with the Windows branch selected.
-; This tests its concurrency on this host without expanding the public API.
-(rule
- (target system_threaded.ml)
- (deps ../lib/system.ml)
- (action
-  (with-stdout-to %{target}
-   (progn
-    (echo "open Troopl\nmodule Sys = struct include Sys let win32 = true end\n")
-    (cat %{dep:../lib/system.ml})))))

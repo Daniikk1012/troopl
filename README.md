@@ -78,9 +78,8 @@ Native interfaces are described in the specification. Implementation details:
 
 - Process commands are argument vectors, without an implicit shell. Signal
   termination reports exit code 128.
-- Process IO uses nonblocking pipes with `select` on Unix/Cygwin. Native
-  Windows uses concurrent pipe readers because OCaml 5.3 only supports
-  socket nonblocking mode there. Neither path creates temporary files.
+- Process IO uses concurrent pipe readers on every platform, without
+  temporary files or a separate platform-specific IO implementation.
   Captured output is materialized in memory, not streamed to Troopl.
 - Directory entries are sorted by byte order. Rename replacement behavior
   follows the host OS; working-directory changes affect the whole process.
