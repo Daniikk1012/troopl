@@ -57,8 +57,17 @@ and fill_with_entries env locals captured value entries =
         in
         let run = make_method captures args scope_size body in
         Value.add_method_id value selector run
-    | Ir.Method _ ->
-        invalid_arg "uncompiled method in executable IR"
+    | Ir.Method { name; args; body; captures; scope_size } ->
+        (* Reference path for lower ~optimize:false and differential tests. *)
+        let run env values =
+          let frame = Array.make scope_size None in
+          List.iter2 (fun value index ->
+            Option.iter (fun i -> frame.(i) <- Some value) index) values args;
+          List.iter (fun (c : Ir.capture) ->
+            frame.(c.inner) <- locals.(c.outer)) captures;
+          (eval_ir [@tailcall]) frame [||] env body
+        in
+        Value.add_method value name (List.length args) run
     | Ir.Inclusion { value = inclusion; pos } ->
         let inclusion = eval_ir locals captured env inclusion in
         Diagnostics.locate env pos;

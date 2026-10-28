@@ -42,7 +42,12 @@ let () =
   check "zero capture plan" (p = Ir.NoCaptures);
   let env = Env.make () in
   List.iter (fun (source, expected) ->
-    check source (Value.as_number (eval env source) = expected))
+    check source (Value.as_number (eval env source) = expected);
+    let reference = Lexer.create source |> Parser.parse
+      |> Lowerer.lower ~optimize:false in
+    check ("reference " ^ source)
+      (Value.as_number (Evaluator.eval reference.scope_size env reference.ir)
+       = expected))
     ["A 1 F {outer {inner (A)}} F outer inner", 1.;
      "A 1 B 2 F {outer ((A) {inner (B)})} F outer inner", 2.;
      "A 1 F {outer X {inner (A + X)}} F outer 2 inner", 3.;
