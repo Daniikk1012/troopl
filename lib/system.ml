@@ -7,7 +7,7 @@ let rec wait pid =
 let command env source =
   let size = Builtins.size_of_value env source in
   if size = 0 then Runtime.error "empty command argument list";
-  let at = Value.get_method source "at" 1 env in
+  let at = Value.get_method_id source Native_selectors.id_at_1 env in
   Array.init size (fun i ->
     let value = Runtime.resume (fun () ->
       at [Builtins.make_number env (float i)]) in
@@ -134,14 +134,14 @@ let execute env argv input =
   in
   let code = Builtins.make_number env (float code) in
   let result = Value.uninitialized () in
-  Value.add_method result "stdout" 0 (fun _ _ -> stdout);
-  Value.add_method result "stderr" 0 (fun _ _ -> stderr);
-  Value.add_method result "exit-code" 0 (fun _ _ -> code);
+  Value.add_method_id result Native_selectors.id_stdout_0 (fun _ _ -> stdout);
+  Value.add_method_id result Native_selectors.id_stderr_0 (fun _ _ -> stderr);
+  Value.add_method_id result Native_selectors.id_exit_code_0 (fun _ _ -> code);
   Value.finish result
 
 let make ?(arguments = []) () =
   let system = Value.uninitialized () in
-  Value.add_method system "args" 0 (fun env _ ->
+  Value.add_method_id system Native_selectors.id_args_0 (fun env _ ->
     Array.of_list arguments
     |> Array.map (Builtins.make_byte_string env)
     |> Builtins.make_list env);
@@ -149,16 +149,16 @@ let make ?(arguments = []) () =
     let argv = command env source in
     Outcome.attempt env (fun () -> execute env argv input)
   in
-  Value.add_method system "run" 1 (fun env args ->
+  Value.add_method_id system Native_selectors.id_run_1 (fun env args ->
     run env (List.hd args) "");
-  Value.add_method system "run" 2 (fun env args ->
+  Value.add_method_id system Native_selectors.id_run_2 (fun env args ->
     match args with
     | [source; input] ->
         let input = Builtins.string_of_value env input in
         run env source input
     | _ -> invalid_arg "wrong arity");
-  Value.add_method system "time" 0 (fun env _ ->
+  Value.add_method_id system Native_selectors.id_time_0 (fun env _ ->
     Builtins.make_number env (Unix.gettimeofday ()));
-  Value.add_method system "exit" 1 (fun _ args ->
+  Value.add_method_id system Native_selectors.id_exit_1 (fun _ args ->
     List.hd args |> Builtins.int_of_value |> exit);
   Value.finish system

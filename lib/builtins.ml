@@ -1,9 +1,39 @@
 let finish = Value.finish
 
+let number_selector = Selector.intern "number" 1
+let boolean_selector = Selector.intern "boolean" 1
+let string_selector = Selector.intern "string" 1
+let list_selector = Selector.intern "list" 1
+
 let extend env kind value =
-  let core = Value.get_method env "core" 0 env [] in
-  let extension = Value.get_method core "extend" 0 env [] in
-  Value.get_method extension kind 1 env [value]
+  let core = Value.get_method_id env Native_selectors.id_core_0 env [] in
+  let extension = Value.get_method_id core Native_selectors.id_extend_0 env [] in
+  let selector = match kind with
+    | "number" -> number_selector
+    | "boolean" -> boolean_selector
+    | "string" -> string_selector
+    | "list" -> list_selector
+    | _ -> Selector.intern kind 1
+  in
+  Value.get_method_id extension selector env [value]
+
+let arithmetic =
+  List.map (fun (name, op) -> Selector.intern name 1, op)
+    ["+", ( +. ); "-", ( -. ); "*", ( *. ); "/", ( /. );
+     "mod", (fun a b ->
+       let divisor = Float.abs b in
+       let remainder = mod_float a divisor in
+       if remainder < 0. then remainder +. divisor else remainder);
+     "rem", mod_float; "^", Float.pow]
+
+let comparisons =
+  List.map (fun (name, op) -> Selector.intern name 1, op)
+    ["=", ( = ); "<>", ( <> ); "<", ( < ); ">", ( > );
+     "<=", ( <= ); ">=", ( >= )]
+
+let rounding =
+  List.map (fun (name, op) -> Selector.intern name 0, op)
+    ["floor", Float.floor; "ceil", Float.ceil; "trunc", Float.trunc]
 
 let expand_decimal text =
   match String.index_opt text 'e' with
@@ -48,14 +78,14 @@ let int_of_value value =
 
 let size_of_value env value =
   let result = Runtime.resume (fun () ->
-    Value.get_method value "size" 0 env []) in
+    Value.get_method_id value Native_selectors.id_size_0 env []) in
   let size = int_of_value result in
   if size < 0 then Runtime.error ("invalid size " ^ string_of_int size);
   size
 
 let make_boolean env bool =
   let value = Value.uninitialized () in
-  Value.add_method value "then-else" 2 (fun _ values ->
+  Value.add_method_id value Native_selectors.id_then_else_2 (fun _ values ->
     match values with
     | [a; b] -> if bool then a else b
     | _ -> invalid_arg "wrong arity");
@@ -64,27 +94,21 @@ let make_boolean env bool =
 let rec make_number env number =
   let value = Value.uninitialized () in
   Value.set_number value number;
-  List.iter (fun (name, operation) ->
-    Value.add_method value name 1 (fun env values ->
+  List.iter (fun (selector, operation) ->
+    Value.add_method_id value selector (fun env values ->
       operation number (List.hd values |> Value.as_number)
       |> make_number env))
-    ["+", ( +. ); "-", ( -. ); "*", ( *. ); "/", ( /. );
-     "mod", (fun a b ->
-       let divisor = Float.abs b in
-       let remainder = mod_float a divisor in
-       if remainder < 0. then remainder +. divisor else remainder);
-     "rem", mod_float; "^", Float.pow];
-  Value.add_method value "-" 0 (fun env _ -> make_number env (-. number));
-  List.iter (fun (name, compare) ->
-    Value.add_method value name 1 (fun env values ->
+    arithmetic;
+  Value.add_method_id value Native_selectors.id_negate_0 (fun env _ -> make_number env (-. number));
+  List.iter (fun (selector, compare) ->
+    Value.add_method_id value selector (fun env values ->
       compare number (List.hd values |> Value.as_number) |> make_boolean env))
-    ["=", ( = ); "<>", ( <> ); "<", ( < ); ">", ( > );
-     "<=", ( <= ); ">=", ( >= )];
-  List.iter (fun (name, operation) ->
-    Value.add_method value name 0
+    comparisons;
+  List.iter (fun (selector, operation) ->
+    Value.add_method_id value selector
       (fun env _ -> operation number |> make_number env))
-    ["floor", Float.floor; "ceil", Float.ceil; "trunc", Float.trunc];
-  Value.add_method value "to-string" 0
+    rounding;
+  Value.add_method_id value Native_selectors.id_to_string_0
     (fun env _ -> make_string env (string_of_number number));
   extend env "number" (finish value)
 
@@ -109,31 +133,31 @@ and make_string_codes env codes =
   let array = Array.map (fun code -> make_number env (float code)) codes in
   let size = make_number env (float (Array.length array)) in
   let value = Value.uninitialized () in
-  Value.add_method value "at" 1 (fun _ args ->
+  Value.add_method_id value Native_selectors.id_at_1 (fun _ args ->
     let index = List.hd args |> int_of_value in
     if index < 0 || index >= Array.length array then
       Runtime.error ("index out of bounds: " ^ string_of_int index);
     array.(index));
-  Value.add_method value "size" 0 (fun _ _ -> size);
+  Value.add_method_id value Native_selectors.id_size_0 (fun _ _ -> size);
   extend env "string" (finish value)
 
 let minimal_list env values =
   let array = values in
   let size = make_number env (float (Array.length array)) in
   let value = Value.uninitialized () in
-  Value.add_method value "at" 1 (fun _ args ->
+  Value.add_method_id value Native_selectors.id_at_1 (fun _ args ->
     let index = List.hd args |> int_of_value in
     if index < 0 || index >= Array.length array then
       Runtime.error ("index out of bounds: " ^ string_of_int index);
     array.(index));
-  Value.add_method value "size" 0 (fun _ _ -> size);
+  Value.add_method_id value Native_selectors.id_size_0 (fun _ _ -> size);
   finish value
 
 let make_list env values = extend env "list" (minimal_list env values)
 
 let string_of_value ?(lossless = true) env value =
   let size = size_of_value env value in
-  let at = Value.get_method value "at" 1 env in
+  let at = Value.get_method_id value Native_selectors.id_at_1 env in
   let buffer = Buffer.create (min size 4096) in
   for i = 0 to size - 1 do
     let element = Runtime.resume (fun () ->
@@ -149,7 +173,7 @@ let string_of_value ?(lossless = true) env value =
 
 let bytes_of_value env value =
   let size = size_of_value env value in
-  let at = Value.get_method value "at" 1 env in
+  let at = Value.get_method_id value Native_selectors.id_at_1 env in
   let bytes = Bytes.create size in
   for i = 0 to size - 1 do
     let element = Runtime.resume (fun () ->

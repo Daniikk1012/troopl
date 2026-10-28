@@ -28,6 +28,21 @@ let measure label units operation =
 let () =
   let env = Env.make () in
   print_endline "workload,units,median_seconds,allocated_bytes,live_words,stack_words";
+  List.iter (fun (label, source) ->
+    let ir = lower source in
+    measure label 100000 (fun () ->
+      let last = ref (Value.empty ()) in
+      for _ = 1 to 100000 do last := run env ir done;
+      !last))
+    ["closures-zero",
+      "F {make X (({touch (X)}) {answer 7})} F make 9";
+     "closures-inherited",
+      "A 1 F {make X ((X) {first {second (A)}})} F make 9"];
+  let custom = run env (lower
+    "C (core) X (C extend) E {() core {C extend {X number N {N extra 0}}}} E") in
+  let ir = lower
+    "L {run I (I < 100000 then-else [L run (I + 1)] [I] run)} L run 0" in
+  measure "custom-hook-loop" 100000 (fun () -> run custom ir);
   List.iter (fun count ->
     let source = Printf.sprintf
       "L {run I (I < %d then-else [L run (I + 1)] [I] run)} L run 0"

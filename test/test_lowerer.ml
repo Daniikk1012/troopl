@@ -1,7 +1,8 @@
 open Troopl
 
 let lower string scope_size =
-  let lowered = Lexer.create string |> Parser.parse |> Lowerer.lower in
+  let lowered = Lexer.create string |> Parser.parse
+    |> Lowerer.lower ~optimize:false in
   assert (lowered.scope_size = scope_size);
   lowered.ir
 

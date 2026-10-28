@@ -6,7 +6,7 @@ let path env value =
 let read_handle channel =
   let closed = ref false in
   let handle = Value.uninitialized () in
-  Value.add_method handle "read" 1 (fun env args ->
+  Value.add_method_id handle Native_selectors.id_read_1 (fun env args ->
     let count = List.hd args |> Builtins.int_of_value in
     if count <= 0 then Runtime.error "read size must be positive";
     if !closed then Runtime.error "file is closed";
@@ -15,7 +15,7 @@ let read_handle channel =
       let buffer = Bytes.create capacity in
       let used = input channel buffer 0 capacity in
       Builtins.list_of_bytes env (Bytes.sub buffer 0 used)));
-  Value.add_method handle "close" 0 (fun env _ ->
+  Value.add_method_id handle Native_selectors.id_close_0 (fun env _ ->
     if !closed then Outcome.failure env "file is already closed"
     else Outcome.attempt env (fun () ->
       closed := true;
@@ -26,17 +26,17 @@ let read_handle channel =
 let write_handle channel =
   let closed = ref false in
   let handle = Value.uninitialized () in
-  Value.add_method handle "write" 1 (fun env args ->
+  Value.add_method_id handle Native_selectors.id_write_1 (fun env args ->
     if !closed then Runtime.error "file is closed"
     else
       let bytes = List.hd args |> Builtins.bytes_of_value env in
       Outcome.attempt env (fun () ->
         output_bytes channel bytes;
         handle));
-  Value.add_method handle "flush" 0 (fun env _ ->
+  Value.add_method_id handle Native_selectors.id_flush_0 (fun env _ ->
     if !closed then Runtime.error "file is closed";
     Outcome.attempt env (fun () -> flush channel; handle));
-  Value.add_method handle "close" 0 (fun env _ ->
+  Value.add_method_id handle Native_selectors.id_close_0 (fun env _ ->
     if !closed then Outcome.failure env "file is already closed"
     else Outcome.attempt env (fun () ->
       closed := true;
@@ -72,12 +72,12 @@ let metadata env filename =
 
 let make () =
   let fs = Value.uninitialized () in
-  Value.add_method fs "read" 1 (fun env args ->
+  Value.add_method_id fs Native_selectors.id_read_1 (fun env args ->
     let path = List.hd args |> path env in
     Outcome.attempt env (fun () ->
       In_channel.with_open_bin path (fun channel ->
         In_channel.input_all channel |> Builtins.make_byte_string env)));
-  Value.add_method fs "write" 2 (fun env args ->
+  Value.add_method_id fs Native_selectors.id_write_2 (fun env args ->
     match args with
     | [filename; source] ->
         let path = path env filename in
@@ -88,20 +88,20 @@ let make () =
             output_string channel text);
           fs)
     | _ -> invalid_arg "wrong arity");
-  Value.add_method fs "open-read" 1 (fun env args ->
+  Value.add_method_id fs Native_selectors.id_open_read_1 (fun env args ->
     let path = List.hd args |> path env in
     Outcome.attempt env (fun () -> open_in_bin path |> read_handle));
-  Value.add_method fs "open-write" 1 (fun env args ->
+  Value.add_method_id fs Native_selectors.id_open_write_1 (fun env args ->
     let path = List.hd args |> path env in
     Outcome.attempt env (fun () -> open_out_bin path |> write_handle));
-  Value.add_method fs "metadata" 1 (fun env args ->
+  Value.add_method_id fs Native_selectors.id_metadata_1 (fun env args ->
     let filename = path env (List.hd args) in
     Outcome.attempt env (fun () -> metadata env filename));
-  Value.add_method fs "real-path" 1 (fun env args ->
+  Value.add_method_id fs Native_selectors.id_real_path_1 (fun env args ->
     let filename = path env (List.hd args) in
     Outcome.attempt env (fun () ->
       Unix.realpath filename |> Builtins.make_byte_string env));
-  Value.add_method fs "rename" 2 (fun env args ->
+  Value.add_method_id fs Native_selectors.id_rename_2 (fun env args ->
     match args with
     | [source; target] ->
         let source = path env source and target = path env target in
@@ -114,10 +114,10 @@ let make () =
     ["make-dir", (fun dir -> Unix.mkdir dir 0o755);
      "remove", Unix.unlink; "remove-dir", Unix.rmdir;
      "working-dir", Unix.chdir];
-  Value.add_method fs "working-dir" 0 (fun env _ ->
+  Value.add_method_id fs Native_selectors.id_working_dir_0 (fun env _ ->
     Outcome.attempt env (fun () ->
       Unix.getcwd () |> Builtins.make_byte_string env));
-  Value.add_method fs "list-dir" 1 (fun env args ->
+  Value.add_method_id fs Native_selectors.id_list_dir_1 (fun env args ->
     let directory = path env (List.hd args) in
     Outcome.attempt env (fun () ->
       let names = Sys.readdir directory in
