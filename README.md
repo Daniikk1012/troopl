@@ -36,6 +36,8 @@ normally installed with OCaml.
 
 Run the opt-in timing/allocation benchmarks separately from correctness tests:
 
+See [committed performance results and prototype comparisons](benchmarks/RESULTS.md).
+
 ```sh
 dune exec test/benchmark.exe
 ```
