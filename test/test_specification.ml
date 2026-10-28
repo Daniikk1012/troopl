@@ -256,7 +256,8 @@ let () =
           check "stdout flush returns IO"
             (ok env flushed && read output_path = "\255");
           let err = call env io "error" [] in
-          ignore (call env err "raw-print" [s env "\254"]);
+          let bytes = Builtins.list_of_bytes env (Bytes.of_string "\254") in
+          ignore (call env err "write" [bytes]);
           let flushed = call env err "flush" [] in
           check "stderr flush returns error IO"
             (ok env flushed && read error_path = "\254")))));

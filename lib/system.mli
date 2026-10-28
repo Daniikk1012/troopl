@@ -1,1 +1,1 @@
-val make : unit -> Value.t
+val make : ?arguments:string list -> unit -> Value.t

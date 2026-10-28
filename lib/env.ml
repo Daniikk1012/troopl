@@ -13,6 +13,9 @@ let make_io ~input ~output ~error =
     in
     Value.add_method value "print" 1 (print true);
     Value.add_method value "raw-print" 1 (print false);
+    Value.add_method value "write" 1 (fun env args ->
+      let bytes = Builtins.bytes_of_value env (List.hd args) in
+      Outcome.attempt env (fun () -> output_bytes channel bytes; value));
     Value.add_method value "flush" 0 (fun env _ ->
       Outcome.attempt env (fun () -> flush channel; value));
     value
@@ -25,8 +28,19 @@ let make_io ~input ~output ~error =
       let text = input_line input in
       Builtins.make_byte_string env text |> Outcome.success env
     with
-    | End_of_file -> Outcome.failure env "end of input"
-    | Sys_error message -> Outcome.failure env message);
+    | End_of_file ->
+        let eof = Builtins.make_boolean env true in
+        Outcome.failure ~fields:["eof?", eof] env "end of input"
+    | Sys_error message ->
+        let eof = Builtins.make_boolean env false in
+        Outcome.failure ~fields:["eof?", eof] env message);
+  Value.add_method io "read" 1 (fun env args ->
+    let count = Builtins.int_of_value (List.hd args) in
+    if count <= 0 then Runtime.error "read size must be positive";
+    Outcome.attempt env (fun () ->
+      let bytes = Bytes.create (min count 65536) in
+      let used = Stdlib.input input bytes 0 (Bytes.length bytes) in
+      Builtins.list_of_bytes env (Bytes.sub bytes 0 used)));
   Value.finish io
 
 let environment_control () =
@@ -66,7 +80,7 @@ let from_sequence env sequence =
       (loop [@tailcall]) next)
     in
     let nil = branch (fun () ->
-      Builtins.make_list env (Dynarray.to_array values))
+      Builtins.minimal_list env (Dynarray.to_array values))
     in
     (* Church dispatch executes a branch, rather than inspecting a boolean. *)
     let chosen = Runtime.resume (fun () ->
@@ -130,7 +144,7 @@ let array () =
     Builtins.make_number env (float (Dynarray.length elements)));
   Value.finish value
 
-let make ?(filename = "<string>") ?(input = stdin) ?(output = stdout)
+let make ?(filename = "<string>") ?arguments ?(input = stdin) ?(output = stdout)
     ?(error = stderr) () =
   let value = Value.uninitialized () in
   let constant name capability =
@@ -138,7 +152,8 @@ let make ?(filename = "<string>") ?(input = stdin) ?(output = stdout)
   in
   constant "io" (make_io ~input ~output ~error);
   constant "fs" (Filesystem.make ());
-  constant "system" (System.make ());
+  let arguments = Option.value arguments ~default:[filename] in
+  constant "system" (System.make ~arguments ());
   constant "utf-8" (Encoding.make ());
   constant "env" (environment_control ());
   constant "core" (make_core ());

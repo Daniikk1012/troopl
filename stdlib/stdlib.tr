@@ -106,11 +106,12 @@ Library {
         size (X size)
         at I (F run (X at (Library index I (X size))))
       })
-      filter P (core from-seq (Library filter-sequence X P 0))
+      filter P (core extend list
+        (core from-seq (Library filter-sequence X P 0)))
       fold F Seed (Library fold X F 0 Seed)
       for-each F (Library each X F 0)
       to-seq (Library sequence X 0)
-      strict (core from-seq (Self to-seq))
+      strict (core extend list (core from-seq (Self to-seq)))
     }
     Self
   )
@@ -198,13 +199,13 @@ Library {
       }
       list {
         range Start Stop (Library range Start Stop)
-        from L (core from-seq (Library sequence L 0))
+        from L (core extend list (core from-seq (Library sequence L 0)))
         from-minimal L (core extend list L)
         of (
           A (array)
           Builder {
             and X ((A push X) Builder)
-            end (core from-seq (Library sequence A 0))
+            end (core extend list (core from-seq (Library sequence A 0)))
           }
           Builder
         )

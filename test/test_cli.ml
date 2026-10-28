@@ -9,7 +9,7 @@ let contains text needle =
   in
   scan 0
 
-let run filename =
+let run ?(arguments = []) filename =
   let output_path = Filename.temp_file "troopl-cli-" ".out" in
   let error_path = Filename.temp_file "troopl-cli-" ".err" in
   Fun.protect
@@ -21,7 +21,8 @@ let run filename =
         Fun.protect ~finally:(fun () -> Unix.close output; Unix.close error)
           (fun () ->
             Unix.create_process "../bin/main.exe"
-              [|"troopl"; filename|] Unix.stdin output error)
+              (Array.of_list ("troopl" :: filename :: arguments))
+              Unix.stdin output error)
       in
       let _, status = Unix.waitpid [] pid in
       status, read output_path, read error_path)
@@ -77,4 +78,12 @@ let () =
     (contains error (missing ^ ": IO ERROR"));
   check "file IO error has no invented position"
     (not (contains error ":1:1:"));
-  print_endline "CLI filename, position, IO, exit and crash checks passed"
+  with_source
+    "(io print (system args at 0)) (io print (system args at 1))"
+    (fun filename ->
+      let status, output, error = run ~arguments:["hello world"] filename in
+      check "CLI accepts program arguments" (status = Unix.WEXITED 0);
+      check "CLI exposes filename and exact argument"
+        (output = filename ^ "\nhello world\n");
+      check "CLI arguments quiet stderr" (error = ""));
+  print_endline "CLI filename, arguments, IO, exit and crash checks passed"

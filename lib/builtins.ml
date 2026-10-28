@@ -27,9 +27,9 @@ let expand_decimal text =
         ^ String.sub digits point (String.length digits - point)
 
 let string_of_number number =
-  if Float.is_nan number then "NaN"
-  else if number = infinity then "Infinity"
-  else if number = neg_infinity then "Infinity-"
+  if Float.is_nan number then "0nan"
+  else if number = infinity then "0inf"
+  else if number = neg_infinity then "0inf-"
   else
     let text = Printf.sprintf "%.17g" (Float.abs number) |> expand_decimal in
     let text =
@@ -37,7 +37,7 @@ let string_of_number number =
         String.sub text 0 (String.length text - 1)
       else text
     in
-    if number < 0. then text ^ "-" else text
+    if Float.sign_bit number then text ^ "-" else text
 
 let int_of_value value =
   let n = Value.as_number value in
@@ -117,7 +117,7 @@ and make_string_codes env codes =
   Value.add_method value "size" 0 (fun _ _ -> size);
   extend env "string" (finish value)
 
-let make_list env values =
+let minimal_list env values =
   let array = values in
   let size = make_number env (float (Array.length array)) in
   let value = Value.uninitialized () in
@@ -127,7 +127,9 @@ let make_list env values =
       Runtime.error ("index out of bounds: " ^ string_of_int index);
     array.(index));
   Value.add_method value "size" 0 (fun _ _ -> size);
-  extend env "list" (finish value)
+  finish value
+
+let make_list env values = extend env "list" (minimal_list env values)
 
 let string_of_value ?(lossless = true) env value =
   let size = size_of_value env value in

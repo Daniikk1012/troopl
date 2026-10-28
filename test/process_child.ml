@@ -19,6 +19,7 @@ let () =
       flush stderr;
       In_channel.input_all stdin |> String.length |> Printf.printf "%d"
   | "exit" -> exit 7
+  | "signal" -> Unix.kill (Unix.getpid ()) Sys.sigterm
   | "early" ->
       (* Exit without reading stdin; the parent must tolerate a broken pipe. *)
       output_string stdout "early\255";

@@ -9,8 +9,8 @@ let read_handle channel =
   Value.add_method handle "read" 1 (fun env args ->
     let count = List.hd args |> Builtins.int_of_value in
     if count <= 0 then Runtime.error "read size must be positive";
-    if !closed then Outcome.failure env "file is closed"
-    else Outcome.attempt env (fun () ->
+    if !closed then Runtime.error "file is closed";
+    Outcome.attempt env (fun () ->
       let capacity = min count 65536 in
       let buffer = Bytes.create capacity in
       let used = input channel buffer 0 capacity in
@@ -27,12 +27,15 @@ let write_handle channel =
   let closed = ref false in
   let handle = Value.uninitialized () in
   Value.add_method handle "write" 1 (fun env args ->
-    if !closed then Outcome.failure env "file is closed"
+    if !closed then Runtime.error "file is closed"
     else
       let bytes = List.hd args |> Builtins.bytes_of_value env in
       Outcome.attempt env (fun () ->
         output_bytes channel bytes;
         handle));
+  Value.add_method handle "flush" 0 (fun env _ ->
+    if !closed then Runtime.error "file is closed";
+    Outcome.attempt env (fun () -> flush channel; handle));
   Value.add_method handle "close" 0 (fun env _ ->
     if !closed then Outcome.failure env "file is already closed"
     else Outcome.attempt env (fun () ->

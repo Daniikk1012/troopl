@@ -8,6 +8,9 @@ val make_byte_string : Value.t -> string -> Value.t
 (** Takes ownership of the array; callers must not mutate it afterwards. *)
 val make_list        : Value.t -> Value.t array -> Value.t
 
+(** Materialized at/size interface, without the list extension hook. *)
+val minimal_list     : Value.t -> Value.t array -> Value.t
+
 val extend           : Value.t -> string -> Value.t -> Value.t
 val int_of_value     : Value.t -> int
 val size_of_value    : Value.t -> Value.t -> int

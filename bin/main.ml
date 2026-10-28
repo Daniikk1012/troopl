@@ -7,7 +7,7 @@ let report category message position =
 
 let () =
   let program = Sys.argv.(0) in
-  if Array.length Sys.argv <> 2 then (
+  if Array.length Sys.argv < 2 then (
     prerr_endline ("usage: " ^ program ^ " <filename>");
     exit 1);
   let filename = Sys.argv.(1) in
@@ -16,7 +16,9 @@ let () =
     let lowered =
       Lexer.create ~filename source |> Parser.parse |> Lowerer.lower
     in
-    Evaluator.eval lowered.scope_size (Env.make ~filename ()) lowered.ir
+    let arguments = Array.to_list Sys.argv |> List.tl in
+    let env = Env.make ~filename ~arguments () in
+    Evaluator.eval lowered.scope_size env lowered.ir
     |> ignore
   with
   | Lexer.Error   (message, pos) -> report "LEXER ERROR" message pos

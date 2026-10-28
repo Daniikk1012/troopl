@@ -1,3 +1,5 @@
+external signal_number : int -> int = "troopl_signal_number"
+
 let rec wait pid =
   try snd (Unix.waitpid [] pid) with
   | Unix.Unix_error (Unix.EINTR, _, _) -> (wait [@tailcall]) pid
@@ -124,10 +126,11 @@ let execute env argv input =
   let output, error, status = capture argv input in
   let stdout = Builtins.make_byte_string env output in
   let stderr = Builtins.make_byte_string env error in
-  (* A signal has no exit status. Use 128 for abnormal termination. *)
+  (* OCaml signal constants are not portable OS signal numbers. *)
   let code = match status with
     | Unix.WEXITED code -> code
-    | Unix.WSIGNALED _ | Unix.WSTOPPED _ -> 128
+    | Unix.WSIGNALED signal | Unix.WSTOPPED signal ->
+        -(signal_number signal)
   in
   let code = Builtins.make_number env (float code) in
   let result = Value.uninitialized () in
@@ -136,8 +139,12 @@ let execute env argv input =
   Value.add_method result "exit-code" 0 (fun _ _ -> code);
   Value.finish result
 
-let make () =
+let make ?(arguments = []) () =
   let system = Value.uninitialized () in
+  Value.add_method system "args" 0 (fun env _ ->
+    Array.of_list arguments
+    |> Array.map (Builtins.make_byte_string env)
+    |> Builtins.make_list env);
   let run env source input =
     let argv = command env source in
     Outcome.attempt env (fun () -> execute env argv input)

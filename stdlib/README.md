@@ -69,6 +69,8 @@ environment if no branch is selected.
 
 List mapping and concatenation are lazy views. Filtering, `list from`,
 builder `end`, and list `strict` materialize through `core from-seq`.
+Under v0.2 those list-producing methods explicitly apply `core extend list`
+after materialization, since `from-seq` itself now returns only `at`/`size`.
 `fold` takes a `run/2` function, and `map`, `filter`, and `for-each`
 take a `run/1` function. Views may observe later mutation in their source.
 `list from` gives a snapshot; `from-minimal` preserves delegation.
