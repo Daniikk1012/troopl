@@ -37,7 +37,7 @@ let missing selector =
   Runtime.error ("method " ^ Selector.describe selector ^ " not found")
 
 (* No per-lookup search closure. Layouts are sorted once when published. *)
-let rec numeric_index layout selector low high =
+let rec numeric_index (layout : number_layout) (selector : Selector.t) low high =
   if low > high then -1 else
   let index = (low + high) / 2 in
   let key, _ = layout.(index) in
