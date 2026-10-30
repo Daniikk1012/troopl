@@ -18,6 +18,6 @@ let () =
   fails "meta new-method \"x\" 1 []";
   fails "meta invoke {} \"missing\" (array)";
   let base = Env.make () in
-  assert (try ignore (Value.get_method base "meta" 0); false
+  assert (try ignore (Value.get_method base "meta" 0 base []); false
     with Runtime.Error _ -> true);
   print_endline "11 meta capability checks passed"
