@@ -8,8 +8,8 @@ let fails source =
   assert (try ignore (eval source); false with Runtime.Error _ -> true)
 let () =
   number "O (meta new-method \"add\" 2 {run A B (A + B)}) O add 3 4" 7.;
-  number "O (meta new-method \"x\" 0 [7]) meta invoke O \"x\" (array)" 7.;
-  number "O {x A (A)} meta invoke O \"x\" (array push 8)" 8.;
+  number "O (meta new-method \"x\" 0 [7]) () meta invoke O \"x\" (array)" 7.;
+  number "O {x A (A)} () meta invoke O \"x\" (array push 8)" 8.;
   number "N 3 O (meta new-method \"x\" 0 [N]) N 9 O x" 3.;
   number "B [1] O {(meta new-method \"x\" 0 B) x 9} O x" 9.;
   number "B {run (marker)} E {() marker 7} S (env bind E B) O (meta new-method \"x\" 0 S) O x" 7.;
