@@ -133,3 +133,12 @@ dune exec troopl -- examples/calculator/main.tr
 The calculator parses its own input language; it does not evaluate user input
 as Troopl source. The test suite covers the original 50 examples, Version 0.1
 capabilities, and calculator arithmetic, error recovery, persistence, and CLI IO.
+
+## Shared-storage experiment
+
+This branch refines the shared numeric layout prototype with bounded method
+overlays for inclusion and environment binding. It preserves custom literal
+hooks and lexical method captures, with no implicit self. See the
+[benchmark and validation report](benchmarks/SHARED_LAYOUT_OVERLAYS.md) for
+architecture, reproducible measurements and remaining regressions. This
+experimental representation has not been merged into production.

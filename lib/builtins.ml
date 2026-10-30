@@ -91,11 +91,29 @@ let make_boolean env bool =
     | _ -> invalid_arg "wrong arity");
   extend env "boolean" (finish value)
 
+let number_layout_cache = Atomic.make None
+let number_layout_lock = Mutex.create ()
+
 let rec make_number env number =
-  Value.number_from_layout (Lazy.force number_layout) number
+  Value.number_from_layout (get_number_layout ()) number
   |> extend env "number"
 
-and number_layout = lazy (
+and get_number_layout () =
+  match Atomic.get number_layout_cache with
+  | Some layout -> layout
+  | None ->
+      Mutex.lock number_layout_lock;
+      Fun.protect ~finally:(fun () -> Mutex.unlock number_layout_lock)
+        (fun () -> match Atomic.get number_layout_cache with
+          | Some layout -> layout
+          | None ->
+              (* Build only immutable code descriptors under the lock. No
+                 guest code or extension hook runs until after publication. *)
+              let layout = create_number_layout () in
+              Atomic.set number_layout_cache (Some layout);
+              layout)
+
+and create_number_layout () =
   let binary = List.map (fun (selector, operation) ->
     selector, (fun number env args ->
       make_number env (operation number (Value.as_number (List.hd args)))))
@@ -113,7 +131,7 @@ and number_layout = lazy (
     Native_selectors.id_to_string_0,
       (fun number env _ -> make_string env (string_of_number number))
   ] in
-  Value.create_number_layout (Array.of_list (binary @ compare @ round @ other)))
+  Value.create_number_layout (Array.of_list (binary @ compare @ round @ other))
 
 and make_string env text =
   let codes = Dynarray.create () in

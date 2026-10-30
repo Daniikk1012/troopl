@@ -18,4 +18,6 @@ val finish             : t -> t
 val empty              : unit -> t
 val bind               : ?before:(unit -> unit) -> t -> t -> t
 val ensure_initialized : t -> unit
+val storage_depth      : t -> int
+(** Diagnostic representation depth, bounded by eight; not guest-visible. *)
 val to_string          : t -> string

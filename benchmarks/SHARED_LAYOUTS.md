@@ -2,6 +2,11 @@
 
 Branch: codex/prototype-shared-layouts. Not merged into the production branch.
 
+The original design below is historical. The separate
+[bounded-overlay follow-up](SHARED_LAYOUT_OVERLAYS.md) replaces materialized
+inclusion/binding entries and Lazy.force publication, with fresh application,
+retained-heap and cross-domain measurements. It remains experimental.
+
 Fresh numeric objects share an immutable sorted selector-to-code array.
 Each object carries its numeric capture separately. Copying methods into an
 ordinary object creates bound entries retaining that original capture, even

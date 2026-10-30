@@ -151,6 +151,15 @@ release of unrelated parent locals. Nine reference-evaluator comparisons
 cover the same semantic cases. The two prototypes each add eight focused checks
 for layout origin/overrides or purity-cache safety.
 
+## Shared-storage follow-up
+
+The separate [bounded-overlay report](SHARED_LAYOUT_OVERLAYS.md) measures the
+refined prototype against the exact production and layout revisions above.
+It includes identical real-stdlib/calculator workloads, reverse run ordering,
+retained-heap samples, remaining generic-object regressions and raw CSVs.
+The historical Lazy.force and materialized-inclusion limitations described
+above apply to the original prototype, not that follow-up revision.
+
 ## Next decisions
 
 Keep selectors and capture sharing in production.

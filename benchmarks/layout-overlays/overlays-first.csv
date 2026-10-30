@@ -1,0 +1,9 @@
+workload,units,median_seconds,allocated_bytes_per_unit
+construct-native,20000,0.001693,352.01
+construct-stdlib,20000,0.020091,2072.01
+construct-two-inclusions,20000,0.021041,2784.01
+include-existing-number,50000,0.002063,296.00
+construct-eight-guest-methods,50000,0.014729,1168.00
+embedding-numeric-lookup,1000000,0.012136,48.00
+bind-existing-number,20000,0.000188,72.01
+calculator-with-stdlib,1000,1.451140,2761847.67
