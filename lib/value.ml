@@ -45,6 +45,10 @@ let get_method_id value selector =
       Runtime.error
         ("method " ^ Selector.describe selector ^ " not found")
 
+let find_method_id value selector =
+  ensure_initialized value;
+  Hashtbl.find_opt value.methods selector
+
 let get_method value name arity =
   get_method_id value (Selector.intern name arity)
 
