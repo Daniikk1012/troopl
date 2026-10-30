@@ -7,17 +7,22 @@ let report category message position =
 
 let () =
   let program = Sys.argv.(0) in
-  if Array.length Sys.argv < 2 then (
+  let experimental = Array.length Sys.argv > 1
+    && Sys.argv.(1) = "--experimental" in
+  let first = if experimental then 2 else 1 in
+  if Array.length Sys.argv <= first then (
     prerr_endline ("usage: " ^ program ^ " <filename>");
     exit 1);
-  let filename = Sys.argv.(1) in
+  let filename = Sys.argv.(first) in
   try
     let source = In_channel.with_open_bin filename In_channel.input_all in
     let lowered =
       Lexer.create ~filename source |> Parser.parse |> Lowerer.lower
     in
-    let arguments = Array.to_list Sys.argv |> List.tl in
+    let arguments = Array.sub Sys.argv first
+      (Array.length Sys.argv - first) |> Array.to_list in
     let env = Env.make ~filename ~arguments () in
+    let env = if experimental then Experimental.extend env else env in
     Evaluator.eval lowered.scope_size env lowered.ir
     |> ignore
   with
