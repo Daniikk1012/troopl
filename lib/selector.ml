@@ -23,3 +23,11 @@ let describe id =
   Fun.protect ~finally:(fun () -> Mutex.unlock mutex) (fun () ->
     let name, arity = Dynarray.get descriptions id in
     name ^ "/" ^ string_of_int arity)
+
+let fresh label arity =
+  if arity < 0 then invalid_arg "negative method arity";
+  Mutex.lock mutex;
+  Fun.protect ~finally:(fun () -> Mutex.unlock mutex) (fun () ->
+    let id = Dynarray.length descriptions in
+    Dynarray.add_last descriptions (label, arity);
+    id)

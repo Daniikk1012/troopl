@@ -8,6 +8,7 @@ val add_method_id      : t -> Selector.t -> (t -> t list -> t) -> unit
 val add_methods        : t -> t -> unit
 val get_method         : t -> string -> int -> t -> t list -> t
 val get_method_id      : t -> Selector.t -> t -> t list -> t
+val find_method_id     : t -> Selector.t -> (t -> t list -> t) option
 val initialize         : t -> unit
 val finish             : t -> t
 val empty              : unit -> t
