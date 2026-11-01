@@ -1,5 +1,5 @@
 let run env block =
-  let body = Value.get_method block "run" 0 in
+  let body = Value.get_method_id block Native_selectors.id_run_0 in
   (body [@tailcall]) env []
 
 let escape env body =
@@ -7,7 +7,7 @@ let escape env body =
   let live = ref true in
   let domain = Domain.self () and thread = Thread.id (Thread.self ()) in
   let exit = Value.uninitialized () in
-  Value.add_method exit "return" 1 (fun _ values ->
+  Value.add_method_id exit Native_selectors.id_return_1 (fun _ values ->
     if Domain.self () <> domain || Thread.id (Thread.self ()) <> thread then
       Runtime.error "escape belongs to another execution context";
     if not !live then Runtime.error "escape is no longer active";
@@ -15,7 +15,7 @@ let escape env body =
   Value.initialize exit;
   Runtime.resume (fun () ->
     Fun.protect ~finally:(fun () -> live := false) (fun () ->
-      let invoke = Value.get_method body "run" 1 in
+      let invoke = Value.get_method_id body Native_selectors.id_run_1 in
       try invoke env [exit] with Exit value -> value))
 
 let ensure env body cleanup =
@@ -39,9 +39,9 @@ let ensure env body cleanup =
 
 let make () =
   let result = Value.uninitialized () in
-  Value.add_method result "escape" 1 (fun env args ->
+  Value.add_method_id result Native_selectors.id_escape_1 (fun env args ->
     escape env (List.hd args));
-  Value.add_method result "ensure" 2 (fun env args ->
+  Value.add_method_id result Native_selectors.id_ensure_2 (fun env args ->
     match args with
     | [body; cleanup] -> ensure env body cleanup
     | _ -> invalid_arg "wrong arity");
@@ -51,5 +51,5 @@ let extend env =
   let result = Value.uninitialized () in
   Value.add_methods result env;
   let control = make () in
-  Value.add_method result "control" 0 (fun _ _ -> control);
+  Value.add_method_id result Native_selectors.id_control_0 (fun _ _ -> control);
   Value.finish result

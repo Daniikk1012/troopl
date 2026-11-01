@@ -1,4 +1,4 @@
-(** Decode complete scalar values; leave a valid unfinished suffix untouched. *)
+(** Decode complete scalars; leave a valid unfinished suffix untouched. *)
 type decoded = {
   text : string;
   consumed : int;

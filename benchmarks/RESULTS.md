@@ -33,7 +33,7 @@ Repeated untrusted eval can grow this metadata; per-session registries or
 bounded loading policies remain future work. No guest global variables exist.
 
 Capture lowering separates dense local frame slots from capture indices:
-- NoCaptures: no parent frame/capture array is retained.
+- CaptureValues [||]: no parent frame/capture array is retained.
 - ReuseCaptures: inner methods referencing only inherited captures share the
   exact array and keep its original indices, including subsets/reordering.
 - CaptureValues: mixed/local captures use a flat snapshot array. Static
@@ -152,6 +152,10 @@ cover the same semantic cases. The two prototypes each add eight focused checks
 for layout origin/overrides or purity-cache safety.
 
 ## Next decisions
+
+The subsequent [review-fix comparison](REVIEW_FIXES.md) measures the selector,
+IR and capture-plan cleanups against this production head, including mixed
+timing results and raw before/after samples.
 
 Keep selectors and capture sharing in production.
 Keep layouts and purity caching separate. The layout prototype is promising
