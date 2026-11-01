@@ -7,11 +7,14 @@ let location locals captured = function
   | Ir.Capture i -> captured.(i)
 
 let capture_values locals captured sources =
-  let values = Array.make (Array.length sources) None in
-  for i = 0 to Array.length sources - 1 do
-    values.(i) <- location locals captured sources.(i)
-  done;
-  values
+  let count = Array.length sources in
+  if count = 0 then [||] else (
+    let values = Array.make count None in
+    for i = 0 to count - 1 do
+      values.(i) <- location locals captured sources.(i)
+    done;
+    values
+  )
 
 let rec eval_ir locals captured env : Ir.t -> _ = function
   | Definition { index; value; scope = rest } ->
