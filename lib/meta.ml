@@ -20,12 +20,12 @@ let make () =
   let capability = Value.uninitialized () in
   Value.add_method_id capability Native_selectors.id_new_method_3
     (fun env values ->
-    match values with
-    | [name; count; source] ->
-        let name = Builtins.string_of_value env name in
-        let count = arity count in
-        new_method (Selector.intern name count) count source
-    | _ -> invalid_arg "wrong arity");
+      match values with
+      | [name; count; source] ->
+          let name = Builtins.string_of_value env name in
+          let count = arity count in
+          new_method (Selector.intern name count) count source
+      | _ -> invalid_arg "wrong arity");
   Value.add_method_id capability Native_selectors.id_invoke_3 (fun env values ->
     match values with
     | [target; name; source] ->
