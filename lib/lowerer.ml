@@ -55,7 +55,7 @@ let rec lower_expr lowerer (expr : Expression.t) =
   | Call { value; name; args } ->
       let value = lower_expr lowerer value in
       let args  = List.map (lower_expr lowerer) args in
-      Call { value; name; selector = Selector.intern name (List.length args);
+      Call { value; selector = Selector.intern name (List.length args);
         args; pos = expr.pos }
 
 and lower_entry lowerer entry =

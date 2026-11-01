@@ -120,10 +120,18 @@ let () =
 let () =
   match lower "1 + 2 - 3" 0 with
   | Call {
-      value = Call { value = Number (1., _); name = "+"; args = [Number (2., _)] };
-      name = "-";
+      value = Call {
+        value = Number (1., _); selector = add;
+        args = [Number (2., _)]; _
+      };
+      selector = subtract;
       args = [Number (3., _)];
-    } -> ()
+      _
+    } ->
+      assert (add = Selector.intern "+" 1);
+      assert (subtract = Selector.intern "-" 1);
+      assert (Selector.name add = "+");
+      assert (Selector.name subtract = "-")
   | _ -> assert false
 
 let () =

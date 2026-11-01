@@ -12,7 +12,8 @@ let command env source =
     let value = Runtime.resume (fun () ->
       at [Builtins.make_number env (float i)]) in
     let text = Builtins.string_of_value env value in
-    if String.contains text '\000' then Runtime.error "NUL in command argument";
+    if String.contains text '\000' then
+      Runtime.error "NUL in command argument";
     text)
 
 (* A child may exit without reading stdin. Suppress only the SIGPIPE generated

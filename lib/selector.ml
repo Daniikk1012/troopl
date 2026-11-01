@@ -18,8 +18,13 @@ let intern name arity =
         Hashtbl.add registry (name, arity) id;
         id)
 
-let describe id =
+let parts id =
   Mutex.lock mutex;
   Fun.protect ~finally:(fun () -> Mutex.unlock mutex) (fun () ->
-    let name, arity = Dynarray.get descriptions id in
-    name ^ "/" ^ string_of_int arity)
+    Dynarray.get descriptions id)
+
+let name id = fst (parts id)
+
+let describe id =
+  let name, arity = parts id in
+  name ^ "/" ^ string_of_int arity
