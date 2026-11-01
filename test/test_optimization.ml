@@ -27,6 +27,9 @@ let () =
   let a = Selector.intern "same" 0 and b = Selector.intern "same" 1 in
   check "selector stable" (a = Selector.intern ("sa" ^ "me") 0);
   check "arity distinct" (a <> b);
+  check "selector preserves original name"
+    (Selector.name (Selector.intern "name/with/slashes" 2)
+     = "name/with/slashes");
   let ids = Array.make 4 a in
   let threads = Array.init 4 (fun i -> Thread.create (fun () ->
     for _ = 1 to 1000 do ids.(i) <- Selector.intern "parallel" 2 done) ()) in
@@ -39,7 +42,7 @@ let () =
   check "argument requires gathering"
     (match p with Ir.CaptureValues [|Ir.Local _|] -> true | _ -> false);
   let _, p, _ = plan "answer/0" "{answer 7}" in
-  check "zero capture plan" (p = Ir.NoCaptures);
+  check "zero capture plan" (p = Ir.CaptureValues [||]);
   let env = Env.make () in
   List.iter (fun (source, expected) ->
     check source (Value.as_number (eval env source) = expected);
@@ -74,6 +77,15 @@ let () =
   check "zero capture releases parent local frame" (not (Weak.check weak 0));
   check "escaping zero-capture method works"
     (Value.as_number (call host result "answer" []) = 7.);
+  let from_captured = eval host
+    ("F {make Payload {outer (({read (Payload)}) {answer 7})}}"
+     ^ " F make (payload) outer")
+  in
+  Gc.full_major ();
+  check "zero capture releases inherited capture array"
+    (not (Weak.check weak 0));
+  check "zero capture after inherited scope still works"
+    (Value.as_number (call host from_captured "answer" []) = 7.);
   let inherited = eval host
     "A 7 F {make Payload (({read (Payload)}) {first {answer (A)}})} F make (payload)" in
   Gc.full_major ();
