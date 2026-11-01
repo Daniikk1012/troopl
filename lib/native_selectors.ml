@@ -75,3 +75,7 @@ let id_equal__2 = Selector.intern "equal?" 2
 let id_new_method_2 = Selector.intern "new-method" 2
 let id_invoke_2 = Selector.intern "invoke" 2
 let id_run_3 = Selector.intern "run" 3
+let id_control_0 = Selector.intern "control" 0
+let id_escape_1 = Selector.intern "escape" 1
+let id_ensure_2 = Selector.intern "ensure" 2
+let id_return_1 = Selector.intern "return" 1
