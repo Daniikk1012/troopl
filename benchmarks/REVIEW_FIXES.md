@@ -4,6 +4,10 @@ Measured 2026-11-01. Addresses the required selector, IR, capture-interface
 and formatting notes from review5725358816 on PR3. The review also applies
 to the dependent capability branches and independent shared-layout prototype.
 
+The first measurements below document intermediate commit0bc2f8d. The final
+comparison after standard empty-array handling is recorded separately below;
+do not treat the intermediate timing regressions as the final runtime result.
+
 ## Shared changes
 
 - Builtins.extend accepts a selector directly. Fixed extension signatures,
@@ -68,6 +72,34 @@ regressions in some workloads. Allocation totals are not retained heap or RSS.
 The harness's live-word values include GC timing effects; the dedicated weak
 tests are the evidence for releasing unrelated captured payloads. A zero GC
 stack-size field is not a physical stack-space measurement.
+
+## Final comparison after empty-array handling
+
+The expanded layout benchmark exposed a layered-hook regression in the first
+generic gather loop. Following OCaml's own array routines, the gather helper
+now returns [||] directly for an empty input, avoiding caml_array_make. This
+does not restore a NoCaptures IR variant or reuse an unrelated parent array.
+Nonempty gathers still use the same direct loop, without a mapper closure.
+
+Source: [OCaml5.3 array implementation](https://raw.githubusercontent.com/ocaml/ocaml/5.3/stdlib/array.ml).
+
+Final production source: ed51976. Exact baseline: fc4f132. The identical harness
+was run again before/after then after/before, median3 after warmup, without
+concurrent test/build load. Files final-*.csv hold these final samples.
+
+| Workload | Before seconds,first / reverse | After seconds,first / reverse |
+| --- | ---: | ---: |
+| Zero-capture creation,100k | .139798 / .139867 | .136612 / .135715 |
+| Inherited-capture creation,100k | .178317 / .183423 | .171474 / .172297 |
+| Custom-hook loop,100k | .656038 / .649431 | .632536 / .634936 |
+| Tail loop,1M | 2.663425 / 2.677456 | 2.577779 / 2.587421 |
+| Sequence materialization,100k | .483927 / .483380 | .475651 / .474164 |
+| Encode bytes,10k | .017983 / .018394 | .018499 / .017738 |
+
+The final closure/loop/sequence samples are about2-6% faster in these local
+runs. Encoding has mixed timing. Allocated-byte totals are unchanged from the
+after column above; the empty-input correction avoids a runtime call rather
+than allocating fewer guest values. No platform-wide speed claim is made.
 
 ## Validation and optional suggestions
 
