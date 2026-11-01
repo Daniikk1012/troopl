@@ -5,25 +5,41 @@ let extend env selector value =
   let extension =
     Value.get_method_id core Native_selectors.id_extend_0 env []
   in
-  Value.get_method_id extension selector env [value]
+  Value.get_method_id extension selector env [ value ]
 
 let arithmetic =
-  List.map (fun (name, op) -> Selector.intern name 1, op)
-    ["+", ( +. ); "-", ( -. ); "*", ( *. ); "/", ( /. );
-     "mod", (fun a b ->
-       let divisor = Float.abs b in
-       let remainder = mod_float a divisor in
-       if remainder < 0. then remainder +. divisor else remainder);
-     "rem", mod_float; "^", Float.pow]
+  List.map
+    (fun (name, op) -> (Selector.intern name 1, op))
+    [
+      ("+", ( +. ));
+      ("-", ( -. ));
+      ("*", ( *. ));
+      ("/", ( /. ));
+      ( "mod",
+        fun a b ->
+          let divisor = Float.abs b in
+          let remainder = mod_float a divisor in
+          if remainder < 0. then remainder +. divisor else remainder );
+      ("rem", mod_float);
+      ("^", Float.pow);
+    ]
 
 let comparisons =
-  List.map (fun (name, op) -> Selector.intern name 1, op)
-    ["=", ( = ); "<>", ( <> ); "<", ( < ); ">", ( > );
-     "<=", ( <= ); ">=", ( >= )]
+  List.map
+    (fun (name, op) -> (Selector.intern name 1, op))
+    [
+      ("=", ( = ));
+      ("<>", ( <> ));
+      ("<", ( < ));
+      (">", ( > ));
+      ("<=", ( <= ));
+      (">=", ( >= ));
+    ]
 
 let rounding =
-  List.map (fun (name, op) -> Selector.intern name 0, op)
-    ["floor", Float.floor; "ceil", Float.ceil; "trunc", Float.trunc]
+  List.map
+    (fun (name, op) -> (Selector.intern name 0, op))
+    [ ("floor", Float.floor); ("ceil", Float.ceil); ("trunc", Float.trunc) ]
 
 let expand_decimal text =
   match String.index_opt text 'e' with
@@ -34,8 +50,9 @@ let expand_decimal text =
         String.sub text (i + 1) (String.length text - i - 1) |> int_of_string
       in
       let point =
-        Option.value (String.index_opt mantissa '.') ~default:(String.length
-          mantissa)
+        Option.value
+          (String.index_opt mantissa '.')
+          ~default:(String.length mantissa)
       in
       let digits = String.concat "" (String.split_on_char '.' mantissa) in
       let point = point + exponent in
@@ -61,14 +78,15 @@ let string_of_number number =
 
 let int_of_value value =
   let n = Value.as_number value in
-  if not (Float.is_integer n)
-     || n < float min_int || n >= float max_int then
+  if (not (Float.is_integer n)) || n < float min_int || n >= float max_int then
     Runtime.error ("expected a finite integer: " ^ string_of_number n);
   int_of_float n
 
 let size_of_value env value =
-  let result = Runtime.resume (fun () ->
-    Value.get_method_id value Native_selectors.id_size_0 env []) in
+  let result =
+    Runtime.resume (fun () ->
+        Value.get_method_id value Native_selectors.id_size_0 env [])
+  in
   let size = int_of_value result in
   if size < 0 then Runtime.error ("invalid size " ^ string_of_int size);
   size
@@ -76,31 +94,34 @@ let size_of_value env value =
 let make_boolean env bool =
   let value = Value.uninitialized () in
   Value.add_method_id value Native_selectors.id_then_else_2 (fun _ values ->
-    match values with
-    | [a; b] -> if bool then a else b
-    | _ -> invalid_arg "wrong arity");
+      match values with
+      | [ a; b ] -> if bool then a else b
+      | _ -> invalid_arg "wrong arity");
   extend env Native_selectors.id_boolean_1 (finish value)
 
 let rec make_number env number =
   let value = Value.uninitialized () in
   Value.set_number value number;
-  List.iter (fun (selector, operation) ->
-    Value.add_method_id value selector (fun env values ->
-      operation number (List.hd values |> Value.as_number)
-      |> make_number env))
+  List.iter
+    (fun (selector, operation) ->
+      Value.add_method_id value selector (fun env values ->
+          operation number (List.hd values |> Value.as_number)
+          |> make_number env))
     arithmetic;
-  Value.add_method_id value Native_selectors.id_negate_0
-    (fun env _ -> make_number env (-. number));
-  List.iter (fun (selector, compare) ->
-    Value.add_method_id value selector (fun env values ->
-      compare number (List.hd values |> Value.as_number) |> make_boolean env))
+  Value.add_method_id value Native_selectors.id_negate_0 (fun env _ ->
+      make_number env (-.number));
+  List.iter
+    (fun (selector, compare) ->
+      Value.add_method_id value selector (fun env values ->
+          compare number (List.hd values |> Value.as_number) |> make_boolean env))
     comparisons;
-  List.iter (fun (selector, operation) ->
-    Value.add_method_id value selector
-      (fun env _ -> operation number |> make_number env))
+  List.iter
+    (fun (selector, operation) ->
+      Value.add_method_id value selector (fun env _ ->
+          operation number |> make_number env))
     rounding;
-  Value.add_method_id value Native_selectors.id_to_string_0
-    (fun env _ -> make_string env (string_of_number number));
+  Value.add_method_id value Native_selectors.id_to_string_0 (fun env _ ->
+      make_string env (string_of_number number));
   extend env Native_selectors.id_number_1 (finish value)
 
 and make_string env text =
@@ -117,18 +138,17 @@ and make_string env text =
   read 0;
   make_string_codes env (Dynarray.to_array codes)
 
-and make_byte_string env text =
-  make_string_codes env (Utf8.lossless text)
+and make_byte_string env text = make_string_codes env (Utf8.lossless text)
 
 and make_string_codes env codes =
   let array = Array.map (fun code -> make_number env (float code)) codes in
   let size = make_number env (float (Array.length array)) in
   let value = Value.uninitialized () in
   Value.add_method_id value Native_selectors.id_at_1 (fun _ args ->
-    let index = List.hd args |> int_of_value in
-    if index < 0 || index >= Array.length array then
-      Runtime.error ("index out of bounds: " ^ string_of_int index);
-    array.(index));
+      let index = List.hd args |> int_of_value in
+      if index < 0 || index >= Array.length array then
+        Runtime.error ("index out of bounds: " ^ string_of_int index);
+      array.(index));
   Value.add_method_id value Native_selectors.id_size_0 (fun _ _ -> size);
   extend env Native_selectors.id_string_1 (finish value)
 
@@ -137,10 +157,10 @@ let minimal_list env values =
   let size = make_number env (float (Array.length array)) in
   let value = Value.uninitialized () in
   Value.add_method_id value Native_selectors.id_at_1 (fun _ args ->
-    let index = List.hd args |> int_of_value in
-    if index < 0 || index >= Array.length array then
-      Runtime.error ("index out of bounds: " ^ string_of_int index);
-    array.(index));
+      let index = List.hd args |> int_of_value in
+      if index < 0 || index >= Array.length array then
+        Runtime.error ("index out of bounds: " ^ string_of_int index);
+      array.(index));
   Value.add_method_id value Native_selectors.id_size_0 (fun _ _ -> size);
   finish value
 
@@ -152,8 +172,7 @@ let string_of_value ?(lossless = true) env value =
   let at = Value.get_method_id value Native_selectors.id_at_1 env in
   let buffer = Buffer.create (min size 4096) in
   for i = 0 to size - 1 do
-    let element = Runtime.resume (fun () ->
-      at [make_number env (float i)]) in
+    let element = Runtime.resume (fun () -> at [ make_number env (float i) ]) in
     let code = int_of_value element in
     if lossless && code >= -255 && code < 0 then
       Buffer.add_char buffer (Char.chr (-code))
@@ -168,8 +187,7 @@ let bytes_of_value env value =
   let at = Value.get_method_id value Native_selectors.id_at_1 env in
   let bytes = Bytes.create size in
   for i = 0 to size - 1 do
-    let element = Runtime.resume (fun () ->
-      at [make_number env (float i)]) in
+    let element = Runtime.resume (fun () -> at [ make_number env (float i) ]) in
     let byte = int_of_value element in
     if byte < 0 || byte > 255 then
       Runtime.error ("invalid byte " ^ string_of_int byte);
@@ -179,7 +197,7 @@ let bytes_of_value env value =
 
 let list_of_bytes env bytes =
   let values =
-    Array.init (Bytes.length bytes)
-      (fun i -> make_number env (float (Char.code (Bytes.get bytes i))))
+    Array.init (Bytes.length bytes) (fun i ->
+        make_number env (float (Char.code (Bytes.get bytes i))))
   in
   make_list env values

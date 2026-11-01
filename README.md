@@ -48,9 +48,10 @@ runtime may report zero for the GC stack-size field; it is not a stack proof.
 
 ## Contributing
 
-No rules for now except for [style guide](STYLE.md), since `ocamlformat` is not
-used for this project. This might change if this project becomes big enough to
-attract a lot of contributors, but is fine for now.
+- Use `ocamlformat` for formatting (`dune fmt` for project-wide formatting);
+- After applying changes, test them with `dune runtest` before commiting;
+- Try to keep commits small and self-contained, to allow for easy
+  commit-by-commit reviews.
 
 Source files and their responsibilies:
 
