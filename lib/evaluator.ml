@@ -44,7 +44,7 @@ let rec eval_ir locals captured env : Ir.t -> _ = function
       (method_ [@tailcall]) env args
 
 (* This factory receives capture values, never the parent's local frame.
-   In particular, a zero-capture method cannot accidentally retain that frame. *)
+   A zero-capture method cannot accidentally retain that frame. *)
 and make_method captured args scope_size body env values =
   let locals = if scope_size = 0 then [||] else Array.make scope_size None in
   List.iter2

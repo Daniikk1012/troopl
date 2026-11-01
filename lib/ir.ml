@@ -62,7 +62,8 @@ and string_of_entry = function
   | CompiledMethod { selector; body; plan; scope_size; _ } ->
       let plan = match plan with
         | ReuseCaptures -> "reuse"
-        | CaptureValues sources -> "gather:" ^ string_of_int (Array.length sources)
+        | CaptureValues sources ->
+            "gather:" ^ string_of_int (Array.length sources)
       in
       "CompiledMethod " ^ Selector.describe selector ^ " " ^ plan
       ^ " locals:" ^ string_of_int scope_size ^ " " ^ to_string body

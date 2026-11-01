@@ -78,7 +78,8 @@ let () =
   check "escaping zero-capture method works"
     (Value.as_number (call host result "answer" []) = 7.);
   let from_captured = eval host
-    "F {make Payload {outer (({read (Payload)}) {answer 7})}} F make (payload) outer"
+    ("F {make Payload {outer (({read (Payload)}) {answer 7})}}"
+     ^ " F make (payload) outer")
   in
   Gc.full_major ();
   check "zero capture releases inherited capture array"

@@ -56,7 +56,8 @@ let environment_control () =
   Value.add_method_id value Native_selectors.id_bind_2 (fun _ values ->
     match values with
     | [env; value] ->
-        Value.bind ~before:(fun () -> Diagnostics.set_environment env) env value
+        Value.bind ~before:(fun () -> Diagnostics.set_environment env)
+          env value
     | _ -> invalid_arg "wrong arity");
   Value.finish value
 
@@ -69,7 +70,8 @@ let from_sequence env sequence =
       Value.get_method_id node Native_selectors.id_cons__0 env []) in
     let branch body =
       let block = Value.uninitialized () in
-      Value.add_method_id block Native_selectors.id_run_0 (fun _ _ -> (body [@tailcall]) ());
+      Value.add_method_id block Native_selectors.id_run_0
+        (fun _ _ -> (body [@tailcall]) ());
       Value.finish block
     in
     let cons = branch (fun () ->
@@ -85,7 +87,8 @@ let from_sequence env sequence =
     in
     (* Church dispatch executes a branch, rather than inspecting a boolean. *)
     let chosen = Runtime.resume (fun () ->
-      Value.get_method_id condition Native_selectors.id_then_else_2 env [cons; nil]) in
+      Value.get_method_id condition Native_selectors.id_then_else_2
+        env [cons; nil]) in
     let run = Value.get_method_id chosen Native_selectors.id_run_0 in
     (run [@tailcall]) env []
   in
@@ -145,7 +148,8 @@ let array () =
     Builtins.make_number env (float (Dynarray.length elements)));
   Value.finish value
 
-let make ?(filename = "<string>") ?arguments ?(input = stdin) ?(output = stdout)
+let make ?(filename = "<string>") ?arguments ?(input = stdin)
+    ?(output = stdout)
     ?(error = stderr) () =
   let value = Value.uninitialized () in
   let constant name capability =
@@ -167,10 +171,13 @@ let make ?(filename = "<string>") ?arguments ?(input = stdin) ?(output = stdout)
     Evaluator.eval lowered.scope_size env lowered.ir);
   Value.add_method_id value Native_selectors.id_filename_0
     (fun env _ -> Builtins.make_byte_string env filename);
-  Value.add_method_id value Native_selectors.id_box_1 (fun _ args -> box (List.hd args));
+  Value.add_method_id value Native_selectors.id_box_1
+    (fun _ args -> box (List.hd args));
   Value.add_method_id value Native_selectors.id_array_0 (fun _ _ -> array ());
-  Value.add_method_id value Native_selectors.id_true_0 (fun env _ -> Builtins.make_boolean env true);
-  Value.add_method_id value Native_selectors.id_false_0 (fun env _ -> Builtins.make_boolean env false);
+  Value.add_method_id value Native_selectors.id_true_0
+    (fun env _ -> Builtins.make_boolean env true);
+  Value.add_method_id value Native_selectors.id_false_0
+    (fun env _ -> Builtins.make_boolean env false);
   Value.add_method_id value Native_selectors.id_crash_1 (fun env args ->
     List.hd args |> Builtins.string_of_value env |> Runtime.error);
   Value.finish value

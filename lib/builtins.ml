@@ -89,7 +89,8 @@ let rec make_number env number =
       operation number (List.hd values |> Value.as_number)
       |> make_number env))
     arithmetic;
-  Value.add_method_id value Native_selectors.id_negate_0 (fun env _ -> make_number env (-. number));
+  Value.add_method_id value Native_selectors.id_negate_0
+    (fun env _ -> make_number env (-. number));
   List.iter (fun (selector, compare) ->
     Value.add_method_id value selector (fun env values ->
       compare number (List.hd values |> Value.as_number) |> make_boolean env))
