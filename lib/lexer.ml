@@ -22,7 +22,7 @@ let get_utf_8_uchar lexer =
 let get_char lexer =
   if lexer.pos.offset < String.length lexer.input then (
     (* Validate each scalar once as its bytes are consumed, including string,
-       comment and identifier tails. Continuations share this validated span. *)
+       comment and identifier tails. Continuations share the validated span. *)
     if lexer.pos.offset >= lexer.validated_until then (
       let decoded = String.get_utf_8_uchar lexer.input lexer.pos.offset in
       if not (Uchar.utf_decode_is_valid decoded) then

@@ -6,7 +6,8 @@ let advance parser = parser.token <- Lexer.next_token parser.lexer
 
 let expected message parser =
   raise (Error (
-    "unexpected token " ^ Token.string_of_kind parser.token.kind ^ ", expected "
+    "unexpected token " ^ Token.string_of_kind parser.token.kind
+    ^ ", expected "
       ^ message,
     parser.token.pos))
 
