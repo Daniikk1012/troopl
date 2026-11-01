@@ -6,16 +6,6 @@ let location locals captured = function
   | Ir.Local i -> locals.(i)
   | Ir.Capture i -> captured.(i)
 
-let capture_values locals captured sources =
-  let count = Array.length sources in
-  if count = 0 then [||] else (
-    let values = Array.make count None in
-    for i = 0 to count - 1 do
-      values.(i) <- location locals captured sources.(i)
-    done;
-    values
-  )
-
 let rec eval_ir locals captured env : Ir.t -> _ = function
   | Definition { index; value; scope = rest } ->
       locals.(index) <- Some (eval_ir locals captured env value);
@@ -62,7 +52,7 @@ and fill_with_entries env locals captured value entries =
         let captures = match plan with
           | Ir.ReuseCaptures -> captured
           | Ir.CaptureValues sources ->
-              capture_values locals captured sources
+              Array.map (location locals captured) sources
         in
         let run = make_method captures args scope_size body in
         Value.add_method_id value selector run
