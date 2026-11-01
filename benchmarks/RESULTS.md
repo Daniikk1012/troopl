@@ -33,7 +33,7 @@ Repeated untrusted eval can grow this metadata; per-session registries or
 bounded loading policies remain future work. No guest global variables exist.
 
 Capture lowering separates dense local frame slots from capture indices:
-- NoCaptures: no parent frame/capture array is retained.
+- CaptureValues [||]: no parent frame/capture array is retained.
 - ReuseCaptures: inner methods referencing only inherited captures share the
   exact array and keep its original indices, including subsets/reordering.
 - CaptureValues: mixed/local captures use a flat snapshot array. Static

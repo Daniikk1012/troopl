@@ -1,6 +1,6 @@
 type capture = { outer : int; inner : int }
 type location = Local of int | Capture of int
-type capture_plan = NoCaptures | ReuseCaptures | CaptureValues of location array
+type capture_plan = ReuseCaptures | CaptureValues of location array
 
 type t =
   | Definition          of { index : int; value : t; scope : t }
@@ -61,7 +61,6 @@ let rec to_string = function
 and string_of_entry = function
   | CompiledMethod { selector; body; plan; scope_size; _ } ->
       let plan = match plan with
-        | NoCaptures -> "none"
         | ReuseCaptures -> "reuse"
         | CaptureValues sources -> "gather:" ^ string_of_int (Array.length sources)
       in
