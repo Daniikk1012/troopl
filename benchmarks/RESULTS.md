@@ -153,6 +153,10 @@ for layout origin/overrides or purity-cache safety.
 
 ## Next decisions
 
+The subsequent [review-fix comparison](REVIEW_FIXES.md) measures the selector,
+IR and capture-plan cleanups against this production head, including mixed
+timing results and raw before/after samples.
+
 Keep selectors and capture sharing in production.
 Keep layouts and purity caching separate. The layout prototype is promising
 enough for wider workloads, especially realistic custom environments.
