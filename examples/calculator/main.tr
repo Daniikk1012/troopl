@@ -1,0 +1,107 @@
+# Run from the repository root:
+# dune exec troopl -- examples/calculator/main.tr
+Source (fs read "stdlib/stdlib.tr")
+(Source ok? then-else [{}] [(crash (Source message))] run)
+Loader {() filename "stdlib/stdlib.tr"}
+Stdlib (env run Loader [(eval Source)])
+Environment (Stdlib extend ())
+(env run Environment [
+  Calculator (import "examples/calculator/calculator.tr")
+  Session (Calculator new)
+  UI {
+    help (
+      (io print "Troopl calculator: + - * / % ^, parentheses, decimal numbers")
+      (io print "Functions: abs sqrt floor ceil trunc min max pow; constants: pi e ans")
+      (io print "Assignments: radius = 5. Expressions: pi * radius ^ 2")
+      (io print ":vars :history :clear :save PATH :load PATH :info PATH :files PATH")
+      (io print ":pwd :time :exec PROGRAM :help :quit")
+    )
+    report R (
+      R ok? then-else [] [(io error print ("Error: " + (R message)))] run
+    )
+    starts Text Prefix (
+      Text size >= (Prefix size) then-else
+        [(Text substring 0 (Prefix size)) equals Prefix] [(false)] run
+    )
+    argument Text N (Calculator trim (Text substring N (Text size)))
+    command Text (
+      Text equals ":help" then [UI help]
+      else-if [Text equals ":vars"] [
+        Session variables for-each {run Entry (
+          io print ((Entry name) + " = " + (Calculator format (Entry value)))
+        )}
+      ]
+      else-if [Text equals ":history"] [
+        Session history for-each {run Line (io print Line)}
+      ]
+      else-if [Text equals ":clear"] [(Session clear) (io print "Session cleared.")]
+      else-if [UI starts Text ":save "] [
+        R (Session save (UI argument Text 6))
+        (UI report R)
+        R ok? then-else [(io print "Session saved.")] [] run
+      ]
+      else-if [UI starts Text ":load "] [
+        R (Session load (UI argument Text 6))
+        (UI report R)
+        R ok? then-else [(io print ("Loaded " + (R count to-string) + " expressions."))] [] run
+      ]
+      else-if [UI starts Text ":info "] [
+        Path (UI argument Text 6)
+        R (fs metadata Path)
+        (UI report R)
+        R ok? then-else [
+          (io print ("exists: " + (R exists? to-string)))
+          (io print ("file: " + (R file? to-string) + ", directory: " + (R dir? to-string)))
+          (io print ("bytes: " + (R size to-string)))
+          (io print ("modified: " + (R modified to-string)))
+        ] [] run
+      ]
+      else-if [UI starts Text ":files "] [
+        R (fs list-dir (UI argument Text 7))
+        (UI report R)
+        R ok? then-else [R for-each {run Name (io print Name)}] [] run
+      ]
+      else-if [Text equals ":pwd"] [
+        R (fs working-dir)
+        (UI report R)
+        R ok? then-else [(io print R)] [] run
+      ]
+      else-if [Text equals ":time"] [(io print (system time to-string))]
+      else-if [UI starts Text ":exec "] [
+        Command (list of and (UI argument Text 6) end)
+        R (system run Command)
+        (UI report R)
+        R ok? then-else [
+          (io raw-print (R stdout) flush)
+          (io error raw-print (R stderr) flush)
+          (io print ("Exit code: " + (R exit-code to-string)))
+        ] [] run
+      ]
+      else [(io error print "Unknown command. Use :help.")]
+    )
+    loop (
+      (io raw-print "calc> " flush)
+      Line (io read-line)
+      Line ok? then-else [
+        Text (Calculator trim Line)
+        Text equals ":quit" then-else [] [
+          (Text size > 0 then-else [
+            (Text at 0) = 58 then-else [UI command Text] [
+              R (Session calculate Line)
+              R ok? then-else [(io print (Calculator format (R value)))] [
+                io error print ("Error at column " + (R column to-string) + ": " + (R message))
+              ] run
+            ] run
+          ] [] run)
+          UI loop
+        ] run
+      ] [
+        Line message equals "end of input" then-else [] [
+          io error print ("Input error: " + (Line message))
+        ] run
+      ] run
+    )
+  }
+  (UI help)
+  UI loop
+])

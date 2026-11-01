@@ -28,17 +28,12 @@ Both paths are relative to the repository root.
 
 ## Load and use
 
-The loader uses only the default environment. It checks the file and UTF-8
-results before evaluation; incomplete UTF-8 is not silently accepted.
+The loader uses the default environment. Whole-file reads return lossless
+strings; the source lexer rejects malformed or incomplete UTF-8 during `eval`.
 
 ```troopl
-Bytes (fs read "stdlib/stdlib.tr")
-(Bytes ok? then-else [{}] [(crash (Bytes message))] run)
-Source (utf-8 to-string Bytes)
+Source (fs read "stdlib/stdlib.tr")
 (Source ok? then-else [{}] [(crash (Source message))] run)
-(Source remainder size = 0 then-else [{}] [
-  crash "incomplete UTF-8 standard library"
-] run)
 Loader {() filename "stdlib/stdlib.tr"}
 Stdlib (env run Loader [(eval Source)])
 Environment (Stdlib extend ())
@@ -74,21 +69,29 @@ environment if no branch is selected.
 
 List mapping and concatenation are lazy views. Filtering, `list from`,
 builder `end`, and list `strict` materialize through `core from-seq`.
+Under v0.2 those list-producing methods explicitly apply `core extend list`
+after materialization, since `from-seq` itself now returns only `at`/`size`.
 `fold` takes a `run/2` function, and `map`, `filter`, and `for-each`
 take a `run/1` function. Views may observe later mutation in their source.
 `list from` gives a snapshot; `from-minimal` preserves delegation.
 
 Ranges are start-inclusive and stop-exclusive. Substrings use the same bounds
-convention and reject invalid indices. String `strict` materializes Unicode
-characters through the UTF-8 capability. Native arrays keep only their five
+convention and reject invalid indices. String `strict` materializes through
+the lossless byte conversion capability, preserving invalid-byte escapes.
+Native arrays keep only their five
 minimal/mutation methods; use `list from Array` for a snapshot or
 `list from-minimal Array` for a list view.
 
 ## Text files and modules
 
 `fs read-text` and `fs write-text` return the same `ok?` result protocol
-as native filesystem methods. `read-text` preserves CRLF in file contents,
-propagates invalid-byte details, and rejects incomplete final UTF-8 sequences.
+as native filesystem methods. Native `fs read` preserves all bytes, including
+invalid UTF-8. `read-text` adds strict validation: it preserves CRLF, rejects
+negative invalid-byte escapes (including incomplete final UTF-8 sequences),
+and supplies a message, byte offset, and byte value on invalid data.
+`write-text` delegates to the native string writer and returns a filesystem
+success result, not an empty object. The returned native filesystem does not
+carry stdlib-only methods; use the extended environment's `fs` for those.
 
 `import F` reads and evaluates a module using the current environment.
 `import E F` uses the supplied environment. Both install `filename F` in
