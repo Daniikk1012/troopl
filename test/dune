@@ -1,7 +1,7 @@
 (tests
  (names test_troopl test_position test_lexer test_parser test_lowerer
         test_evaluator test_examples test_environment test_stdlib test_cli
-        test_specification test_calculator test_v02 test_optimization)
+        test_specification test_calculator test_v02 test_optimization test_meta)
  (modules (:standard \ process_child benchmark benchmark_pure))
  (libraries troopl unix)
  (deps (source_tree ../examples) (source_tree ../stdlib) ../bin/main.exe
