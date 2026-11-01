@@ -1,19 +1,9 @@
 let finish = Value.finish
 
-let number_selector = Selector.intern "number" 1
-let boolean_selector = Selector.intern "boolean" 1
-let string_selector = Selector.intern "string" 1
-let list_selector = Selector.intern "list" 1
-
-let extend env kind value =
+let extend env selector value =
   let core = Value.get_method_id env Native_selectors.id_core_0 env [] in
-  let extension = Value.get_method_id core Native_selectors.id_extend_0 env [] in
-  let selector = match kind with
-    | "number" -> number_selector
-    | "boolean" -> boolean_selector
-    | "string" -> string_selector
-    | "list" -> list_selector
-    | _ -> Selector.intern kind 1
+  let extension =
+    Value.get_method_id core Native_selectors.id_extend_0 env []
   in
   Value.get_method_id extension selector env [value]
 
@@ -89,7 +79,7 @@ let make_boolean env bool =
     match values with
     | [a; b] -> if bool then a else b
     | _ -> invalid_arg "wrong arity");
-  extend env "boolean" (finish value)
+  extend env Native_selectors.id_boolean_1 (finish value)
 
 let rec make_number env number =
   let value = Value.uninitialized () in
@@ -110,7 +100,7 @@ let rec make_number env number =
     rounding;
   Value.add_method_id value Native_selectors.id_to_string_0
     (fun env _ -> make_string env (string_of_number number));
-  extend env "number" (finish value)
+  extend env Native_selectors.id_number_1 (finish value)
 
 and make_string env text =
   let codes = Dynarray.create () in
@@ -139,7 +129,7 @@ and make_string_codes env codes =
       Runtime.error ("index out of bounds: " ^ string_of_int index);
     array.(index));
   Value.add_method_id value Native_selectors.id_size_0 (fun _ _ -> size);
-  extend env "string" (finish value)
+  extend env Native_selectors.id_string_1 (finish value)
 
 let minimal_list env values =
   let array = values in
@@ -153,7 +143,8 @@ let minimal_list env values =
   Value.add_method_id value Native_selectors.id_size_0 (fun _ _ -> size);
   finish value
 
-let make_list env values = extend env "list" (minimal_list env values)
+let make_list env values =
+  extend env Native_selectors.id_list_1 (minimal_list env values)
 
 let string_of_value ?(lossless = true) env value =
   let size = size_of_value env value in

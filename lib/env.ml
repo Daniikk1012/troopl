@@ -30,10 +30,11 @@ let make_io ~input ~output ~error =
     with
     | End_of_file ->
         let eof = Builtins.make_boolean env true in
-        Outcome.failure ~fields:["eof?", eof] env "end of input"
+        Outcome.failure ~fields:[Native_selectors.id_eof__0, eof]
+          env "end of input"
     | Sys_error message ->
         let eof = Builtins.make_boolean env false in
-        Outcome.failure ~fields:["eof?", eof] env message);
+        Outcome.failure ~fields:[Native_selectors.id_eof__0, eof] env message);
   Value.add_method_id io Native_selectors.id_read_1 (fun env args ->
     let count = Builtins.int_of_value (List.hd args) in
     if count <= 0 then Runtime.error "read size must be positive";

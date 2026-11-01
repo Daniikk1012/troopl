@@ -50,24 +50,25 @@ let metadata env filename =
     | Unix.Unix_error ((Unix.ENOENT | Unix.ENOTDIR), _, _) -> None
   in
   let value = Value.uninitialized () in
-  let boolean name test =
+  let boolean selector test =
     let result = Builtins.make_boolean env (test stat) in
-    Value.add_method value name 0 (fun _ _ -> result)
+    Value.add_method_id value selector (fun _ _ -> result)
   in
-  let number name get =
+  let number selector get =
     let result = Builtins.make_number env
       (Option.fold ~none:0. ~some:get stat) in
-    Value.add_method value name 0 (fun _ _ -> result)
+    Value.add_method_id value selector (fun _ _ -> result)
   in
-  boolean "exists?" Option.is_some;
+  boolean Native_selectors.id_exists__0 Option.is_some;
   let kind test = Option.fold ~none:false ~some:(fun s ->
     test s.Unix.st_kind) in
-  boolean "file?" (kind (( = ) Unix.S_REG));
-  boolean "dir?" (kind (( = ) Unix.S_DIR));
-  boolean "other?" (kind (fun k -> k <> Unix.S_REG && k <> Unix.S_DIR));
-  number "accessed" (fun s -> s.Unix.st_atime);
-  number "modified" (fun s -> s.Unix.st_mtime);
-  number "size" (fun s -> float s.Unix.st_size);
+  boolean Native_selectors.id_file__0 (kind (( = ) Unix.S_REG));
+  boolean Native_selectors.id_dir__0 (kind (( = ) Unix.S_DIR));
+  boolean Native_selectors.id_other__0
+    (kind (fun k -> k <> Unix.S_REG && k <> Unix.S_DIR));
+  number Native_selectors.id_accessed_0 (fun s -> s.Unix.st_atime);
+  number Native_selectors.id_modified_0 (fun s -> s.Unix.st_mtime);
+  number Native_selectors.id_size_0 (fun s -> float s.Unix.st_size);
   Value.finish value
 
 let make () =
@@ -107,13 +108,14 @@ let make () =
         let source = path env source and target = path env target in
         Outcome.attempt env (fun () -> Unix.rename source target; fs)
     | _ -> invalid_arg "wrong arity");
-  List.iter (fun (name, operation) ->
-    Value.add_method fs name 1 (fun env args ->
+  List.iter (fun (selector, operation) ->
+    Value.add_method_id fs selector (fun env args ->
       let filename = path env (List.hd args) in
       Outcome.attempt env (fun () -> operation filename; fs)))
-    ["make-dir", (fun dir -> Unix.mkdir dir 0o755);
-     "remove", Unix.unlink; "remove-dir", Unix.rmdir;
-     "working-dir", Unix.chdir];
+    [Native_selectors.id_make_dir_1, (fun dir -> Unix.mkdir dir 0o755);
+     Native_selectors.id_remove_1, Unix.unlink;
+     Native_selectors.id_remove_dir_1, Unix.rmdir;
+     Native_selectors.id_working_dir_1, Unix.chdir];
   Value.add_method_id fs Native_selectors.id_working_dir_0 (fun env _ ->
     Outcome.attempt env (fun () ->
       Unix.getcwd () |> Builtins.make_byte_string env));
