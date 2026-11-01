@@ -12,7 +12,7 @@ type t =
   | Number              of float * Position.t
   | String              of string * Position.t
   | Environment
-  | Call of { value : t; name : string; selector : Selector.t;
+  | Call of { value : t; selector : Selector.t;
               args : t list; pos : Position.t }
 
 and entry =
@@ -53,8 +53,8 @@ let rec to_string = function
   | String (s, pos) ->
       "String \"" ^ String.escaped s ^ "\" at " ^ Position.to_string pos
   | Environment -> "Environment"
-  | Call { value; name; args; pos; _ } ->
-      "Call (" ^ to_string value ^ ") " ^ name
+  | Call { value; selector; args; pos } ->
+      "Call (" ^ to_string value ^ ") " ^ Selector.name selector
       ^ String.concat "" (List.map (fun x -> " (" ^ to_string x ^ ")") args)
       ^ " at " ^ Position.to_string pos
 

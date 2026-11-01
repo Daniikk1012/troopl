@@ -27,6 +27,9 @@ let () =
   let a = Selector.intern "same" 0 and b = Selector.intern "same" 1 in
   check "selector stable" (a = Selector.intern ("sa" ^ "me") 0);
   check "arity distinct" (a <> b);
+  check "selector preserves original name"
+    (Selector.name (Selector.intern "name/with/slashes" 2)
+     = "name/with/slashes");
   let ids = Array.make 4 a in
   let threads = Array.init 4 (fun i -> Thread.create (fun () ->
     for _ = 1 to 1000 do ids.(i) <- Selector.intern "parallel" 2 done) ()) in
