@@ -66,3 +66,6 @@ let id_make_dir_1 = Selector.intern "make-dir" 1
 let id_remove_1 = Selector.intern "remove" 1
 let id_remove_dir_1 = Selector.intern "remove-dir" 1
 let id_working_dir_1 = Selector.intern "working-dir" 1
+let id_meta_0 = Selector.intern "meta" 0
+let id_new_method_3 = Selector.intern "new-method" 3
+let id_invoke_3 = Selector.intern "invoke" 3
