@@ -37,7 +37,8 @@ let missing selector =
   Runtime.error ("method " ^ Selector.describe selector ^ " not found")
 
 (* No per-lookup search closure. Layouts are sorted once when published. *)
-let rec numeric_index (layout : number_layout) (selector : Selector.t) low high =
+let rec numeric_index (layout : number_layout) (selector : Selector.t)
+    low high =
   if low > high then -1 else
   let index = (low + high) / 2 in
   let key, _ = layout.(index) in
@@ -158,7 +159,7 @@ let rec invoke storage selector env args = match storage with
       (invoke [@tailcall])
         (if contains later selector then later else earlier) selector env args
   | Bound (base, bound_env, before, _) ->
-      (* Missing methods must fail before the diagnostic/environment callback. *)
+      (* Missing methods fail before the diagnostic/environment callback. *)
       if not (contains base selector) then missing selector;
       before ();
       (invoke [@tailcall]) base selector bound_env args
@@ -192,8 +193,12 @@ let empty () = finish (uninitialized ())
 
 let bind ?(before = fun () -> ()) env value =
   ensure_initialized value;
-  { number = value.number; initialized = true;
-    methods = bounded (Bound (value.methods, env, before, depth value.methods + 1)) }
+  {
+    number = value.number;
+    initialized = true;
+    methods =
+      bounded (Bound (value.methods, env, before, depth value.methods + 1))
+  }
 
 let storage_depth value = depth value.methods
 
