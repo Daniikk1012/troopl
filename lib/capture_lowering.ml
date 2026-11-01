@@ -32,8 +32,8 @@ and entry mapping : Ir.entry -> Ir.entry = function
       let sources = Array.of_list (List.map
         (fun (capture : Ir.capture) -> mapping.(capture.outer)) captures) in
       let plan =
-        if Array.length sources = 0 then Ir.NoCaptures
-        else if Array.for_all (function Ir.Capture _ -> true | _ -> false)
+        if Array.length sources > 0
+           && Array.for_all (function Ir.Capture _ -> true | _ -> false)
             sources then Ir.ReuseCaptures
         else Ir.CaptureValues sources
       in

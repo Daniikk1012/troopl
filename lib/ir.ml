@@ -1,6 +1,6 @@
 type capture = { outer : int; inner : int }
 type location = Local of int | Capture of int
-type capture_plan = NoCaptures | ReuseCaptures | CaptureValues of location array
+type capture_plan = ReuseCaptures | CaptureValues of location array
 
 type t =
   | Definition          of { index : int; value : t; scope : t }
@@ -12,7 +12,7 @@ type t =
   | Number              of float * Position.t
   | String              of string * Position.t
   | Environment
-  | Call of { value : t; name : string; selector : Selector.t;
+  | Call of { value : t; selector : Selector.t;
               args : t list; pos : Position.t }
 
 and entry =
@@ -53,17 +53,17 @@ let rec to_string = function
   | String (s, pos) ->
       "String \"" ^ String.escaped s ^ "\" at " ^ Position.to_string pos
   | Environment -> "Environment"
-  | Call { value; name; args; pos; _ } ->
-      "Call (" ^ to_string value ^ ") " ^ name
+  | Call { value; selector; args; pos } ->
+      "Call (" ^ to_string value ^ ") " ^ Selector.name selector
       ^ String.concat "" (List.map (fun x -> " (" ^ to_string x ^ ")") args)
       ^ " at " ^ Position.to_string pos
 
 and string_of_entry = function
   | CompiledMethod { selector; body; plan; scope_size; _ } ->
       let plan = match plan with
-        | NoCaptures -> "none"
         | ReuseCaptures -> "reuse"
-        | CaptureValues sources -> "gather:" ^ string_of_int (Array.length sources)
+        | CaptureValues sources ->
+            "gather:" ^ string_of_int (Array.length sources)
       in
       "CompiledMethod " ^ Selector.describe selector ^ " " ^ plan
       ^ " locals:" ^ string_of_int scope_size ^ " " ^ to_string body
