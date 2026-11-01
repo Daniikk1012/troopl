@@ -21,13 +21,13 @@ let new_key () =
   in
   let key = Value.uninitialized () in
   Value.add_method_id key brand (fun _ _ -> marker);
-  Value.add_method key "new-method" 2 (fun _ values ->
+  Value.add_method_id key Native_selectors.id_new_method_2 (fun _ values ->
     match values with
     | [count; source] ->
         let count = Meta.arity count in
         Meta.new_method (selector count) count source
     | _ -> invalid_arg "wrong arity");
-  Value.add_method key "invoke" 2 (fun env values ->
+  Value.add_method_id key Native_selectors.id_invoke_2 (fun env values ->
     match values with
     | [target; source] ->
         Value.ensure_initialized target;
@@ -35,37 +35,39 @@ let new_key () =
         let body = Value.get_method_id target (selector (List.length args)) in
         (body [@tailcall]) env args
     | _ -> invalid_arg "wrong arity");
-  Value.add_method key "run" 2 (fun _ values ->
+  Value.add_method_id key Native_selectors.id_run_2 (fun _ values ->
     match values with
     | [count; target] ->
         let count = Meta.arity count in
         let body = Value.get_method_id target (selector count) in
         let result = Value.uninitialized () in
-        Value.add_method result "run" count body;
+        Value.add_method_id result (Selector.intern "run" count) body;
         Value.finish result
     | _ -> invalid_arg "wrong arity");
   Value.finish key
 
 let make () =
   let result = Value.uninitialized () in
-  Value.add_method result "new" 0 (fun _ _ -> new_key ());
-  Value.add_method result "equal?" 2 (fun env values ->
+  Value.add_method_id result Native_selectors.id_new_0 (fun _ _ -> new_key ());
+  Value.add_method_id result Native_selectors.id_equal__2 (fun env values ->
     match values with
     | [a;b] -> Builtins.make_boolean env (identity a == identity b)
     | _ -> invalid_arg "wrong arity");
-  List.iter (fun operation ->
-    Value.add_method result operation 3 (fun env values ->
+  List.iter (fun (operation, target) ->
+    Value.add_method_id result operation (fun env values ->
       match values with
       | [key; count; source] ->
           ignore (identity key);
-          let body = Value.get_method key operation 2 in
+          let body = Value.get_method_id key target in
           (body [@tailcall]) env [count;source]
-      | _ -> invalid_arg "wrong arity")) ["new-method";"run"];
+      | _ -> invalid_arg "wrong arity"))
+    [Native_selectors.id_new_method_3, Native_selectors.id_new_method_2;
+     Native_selectors.id_run_3, Native_selectors.id_run_2];
   Value.finish result
 
 let extend env =
   let result = Value.uninitialized () in
   Value.add_methods result env;
   let symbol = make () in
-  Value.add_method result "symbol" 0 (fun _ _ -> symbol);
+  Value.add_method_id result Native_selectors.id_symbol_0 (fun _ _ -> symbol);
   Value.finish result
