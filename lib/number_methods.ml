@@ -38,18 +38,18 @@ let methods =
   Array.sort (fun (a, _) (b, _) -> compare a b) methods;
   methods
 
-let index selector =
-  let rec search low high =
-    if low > high then -1
-    else
-      let i = (low + high) / 2 in
-      let key, _ = methods.(i) in
-      if key = selector then i
-      else if key < selector then (search [@tailcall]) (i + 1) high
-      else (search [@tailcall]) low (i - 1)
-  in
-  search 0 (Array.length methods - 1)
+(* Pass the selector explicitly: a nested search would allocate a closure
+   on every dispatch, defeating the shared-method representation. *)
+let rec search selector low high =
+  if low > high then -1
+  else
+    let i = (low + high) / 2 in
+    let key, _ = methods.(i) in
+    if key = selector then i
+    else if key < selector then (search [@tailcall]) selector (i + 1) high
+    else (search [@tailcall]) selector low (i - 1)
 
+let index selector = search selector 0 (Array.length methods - 1)
 let mem selector = index selector >= 0
 
 let find selector =
