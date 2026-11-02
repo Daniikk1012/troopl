@@ -98,3 +98,128 @@ wide guest objects, repeated overriding, bindings and the calculator. Measure
 allocation and live heap as well as dispatch time. Do not replace the current
 backend based only on asymptotic lookup complexity. This review requested an
 assessment before implementing HAMTs; no unmeasured HAMT runtime is introduced.
+
+## Final measurements
+
+Baseline: `8f6b859` (PR #14 plus the reviewer's `Array.map` change).
+Final implementation: `8cdfdf0`. The partial candidate is generated from that
+exact final commit with `prepare_partial_flatten.py`; only its flattening policy
+and the archived example-manifest line endings differ.
+
+OCaml 5.3.0 native, Dune 3.24.0 bootstrap executable, Cygwin on Windows.
+Warm once, median of five batches after major GC; sequential baseline/full/
+partial, then partial/full/baseline. No builds or installer ran during timing.
+Parsing, source loading and setup are excluded. No confidence intervals or
+cross-platform validation; small timings are sensitive to host variability.
+All CSVs directly in [layout-review-2/](layout-review-2/) are final samples.
+
+### Numeric/runtime comparison
+
+Seconds per batch, first / reverse run order. Allocation is bytes per unit.
+
+| Workload | Units | Before seconds | After seconds | Before bytes | After bytes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| construct-native | 20000 | 0.001432 / 0.001506 | 0.001333 / 0.001287 | 352.01 | 104.01 |
+| construct-stdlib | 20000 | 0.019230 / 0.019186 | 0.021654 / 0.020960 | 2072.01 | 1824.01 |
+| construct-two-inclusions | 20000 | 0.017237 / 0.019042 | 0.019639 / 0.017158 | 2928.01 | 2680.01 |
+| include-existing-number | 50000 | 0.001802 / 0.002012 | 0.002140 / 0.001972 | 296.00 | 296.00 |
+| construct-eight-guest-methods | 50000 | 0.013216 / 0.014457 | 0.014973 / 0.013366 | 1168.00 | 1168.00 |
+| embedding-numeric-lookup | 1000000 | 0.012105 / 0.013202 | 0.014686 / 0.014242 | 48.00 | 48.00 |
+| bind-existing-number | 20000 | 0.000181 / 0.000197 | 0.000203 / 0.000203 | 72.01 | 72.01 |
+| calculator-with-stdlib | 1000 | 1.472312 / 1.529012 | 1.534715 / 1.533280 | 2769719.67 | 2582047.42 |
+
+Native construction allocates about 70.5% less, stdlib numeric construction
+about 12.0% less, and the calculator about 6.8% less. These savings include
+centralizing primitive construction/extension dispatch; they are not all
+attributable to removing one pointer. Every required hook still runs.
+
+Timing is a tradeoff. Native construction is about 7–15% faster in these
+samples, but stdlib construction is about 9–13% slower and extracted numeric
+method lookup about 8–21% slower. Calculator time is about 0.3–4.2% slower.
+Other small samples change direction with run order. No general throughput
+improvement is claimed. The evaluator uses direct `invoke_id`; the extracted
+method benchmark measures the separate embedding `get_method_id` path.
+
+### Retained heap
+
+After full major GC, holding 10,000 results. Bytes per output include its array
+slot; already-rooted source values and fixed startup tables are excluded.
+
+| Workload | Before bytes | After bytes |
+| --- | ---: | ---: |
+| native-number | 96.00 | 88.00 |
+| stdlib-number | 752.00 | 744.00 |
+| include-existing-number | 73.75 | 73.75 |
+| bind-existing-number | 80.00 | 80.00 |
+
+Numbers and stdlib-extended numbers retain eight fewer bytes per output.
+These are live-heap measurements, not RSS. Shallow inclusion/binding results
+are unchanged. Separate weak-reference regressions verify collection of
+overwritten closures and unrelated lexical captures.
+
+### Full versus one-level flattening
+
+Same final callable representation. Seconds per batch, first / reverse order.
+
+| Workload | Units | Full seconds | Partial seconds | Full bytes/unit | Partial bytes/unit |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| override-8 | 2000 | 0.000970 / 0.000976 | 0.003397 / 0.003465 | 548.30 | 1917.52 |
+| lookup-8 | 100000 | 0.002591 / 0.002452 | 0.008051 / 0.008062 | 0.00 | 0.00 |
+| override-64 | 2000 | 0.005849 / 0.005055 | 0.022453 / 0.022876 | 1153.51 | 6742.27 |
+| lookup-64 | 100000 | 0.003174 / 0.002874 | 0.010910 / 0.010642 | 0.00 | 0.00 |
+| override-512 | 2000 | 0.041691 / 0.038772 | 0.181016 / 0.187129 | 6624.43 | 50356.75 |
+| lookup-512 | 100000 | 0.003102 / 0.002943 | 0.010711 / 0.011554 | 0.00 | 0.00 |
+| bind-chain | 2000 | 0.000054 / 0.000052 | 0.000387 / 0.000387 | 109.86 | 653.68 |
+
+The one-level policy repeatedly copies the bottom table and rebuilds ancestors,
+while keeping longer lookup paths. Override allocation grows by about 3.5×
+(8 selectors), 5.8× (64), and 7.6× (512). Both policies pass conformance and
+retention tests, so this is a performance decision, not a semantic rejection.
+
+The calculator runs mostly below the depth threshold. Full versus partial
+calculator timings are 1.534715 / 1.533280 versus 1.470433 / 1.526326 seconds,
+with identical allocation. Those samples do not outweigh the repeatable
+override/lookup cost. **Retain full flattening.** This rejects the measured
+deepest-subtree policy; it does not prove every possible incremental policy
+would be slower.
+
+## Validation and reproduction
+
+Both final policies passed `dune build @install` and the full suite: 199 v0.1,
+52 v0.2, 96 environment/diagnostic, 50 stdlib, 173 calculator, all 50 examples,
+CLI/frontend/evaluator checks, 33 optimization, 220 storage, 8 numeric-layout
+and 14 new review checks. Four-domain tests preserve all 40,000 custom hooks.
+
+Export `8f6b859` for the baseline and `8cdfdf0` for the final full policy.
+Copy `test/benchmark_storage.ml` and its executable/exclusion stanza from the
+final revision into the baseline (benchmark harness only). The existing
+`benchmark_layout.ml` is unchanged. Normalize `examples/expectations.tsv` to
+LF in exports, matching the working checkout; committed CRLF otherwise causes
+a fixture-only failure in the example harness.
+
+From the repository root, prepare a separate partial candidate:
+
+```sh
+python benchmarks/prepare_partial_flatten.py 8cdfdf0 NEW_DIRECTORY
+```
+
+Build and test each exported tree. From each root, run:
+
+```sh
+dune build @install test/benchmark_layout.exe test/benchmark_storage.exe
+dune runtest --force
+_build/default/test/benchmark_layout.exe
+_build/default/test/benchmark_layout.exe --retained
+_build/default/test/benchmark_storage.exe
+```
+
+Repeat in reverse order with no concurrent compiler or benchmark processes.
+Edited sources use ocamlformat 0.29.0 default formatting. Native installation
+hit a Dune/Cygwin build error; formatting was performed offline using its
+JavaScript build, with separate signature parsing and idempotence checks.
+
+Intermediate evidence is retained separately: `intermediate/` measures the
+initial descriptor implementation (`31b770b`, partial generated at `4a17107`);
+`intermediate-search/` measures `a209af2` after removing its search closure.
+The final shared-callable table eliminates the remaining descriptor-wrapper
+capture. Do not use those intermediate files as final results.
