@@ -16,6 +16,10 @@ destination.mkdir(parents=True, exist_ok=False)
 archive = subprocess.check_output(["git", "archive", revision])
 with tarfile.open(fileobj=io.BytesIO(archive)) as files:
     files.extractall(destination, filter="data")
+# git archive preserves the manifest's committed CRLF; the test harness
+# splits on LF, while the normal checkout has this fixture normalized to LF.
+manifest = destination / "examples" / "expectations.tsv"
+manifest.write_bytes(manifest.read_bytes().replace(b"\r\n", b"\n"))
 path = destination / "lib" / "value.ml"
 source = path.read_text()
 start = source.index("let bounded storage =")
