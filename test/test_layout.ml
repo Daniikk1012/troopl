@@ -15,18 +15,11 @@ let () =
   ] in
   List.iter (fun (source,n) -> assert (Value.as_number (eval source) = n))
     cases;
-  let selector = Selector.intern "payload" 0 in
-  let layout = Value.create_number_layout [|
-    selector, (fun captured env _ -> Builtins.make_number env captured)
-  |] in
-  let a = Value.number_from_layout layout 1.
-  and b = Value.number_from_layout layout 2. in
-  assert (Value.as_number (call a "payload" []) = 1.);
-  assert (Value.as_number (call b "payload" []) = 2.);
-  let duplicate = try
-    ignore (Value.create_number_layout [|
-      selector, (fun _ _ _ -> Value.empty ());
-      selector, (fun _ _ _ -> Value.empty ())
-    |]); false with Invalid_argument _ -> true in
-  assert duplicate;
+  let a = Builtins.make_number env 1.
+  and b = Builtins.make_number env 2. in
+  assert (Value.as_number (call a "-" []) = -1.);
+  assert (Value.as_number (call b "-" []) = -2.);
+  let missing = try ignore (call a "payload" []); false
+    with Runtime.Error _ -> true in
+  assert missing;
   print_endline "8 shared-layout prototype checks passed"

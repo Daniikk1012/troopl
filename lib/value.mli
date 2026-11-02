@@ -1,8 +1,4 @@
 type t
-type number_layout
-val create_number_layout :
-  (Selector.t * (float -> t -> t list -> t)) array -> number_layout
-val number_from_layout : number_layout -> float -> t
 val invoke_id : t -> Selector.t -> t -> t list -> t
 
 val uninitialized      : unit -> t
@@ -21,3 +17,12 @@ val ensure_initialized : t -> unit
 val storage_depth      : t -> int
 (** Diagnostic representation depth, bounded by eight; not guest-visible. *)
 val to_string          : t -> string
+
+(** Primitive constructors run every applicable dynamic extension hook.
+    Kept with dispatch to avoid a Value/Builtins initialization cycle. *)
+val extend : t -> Selector.t -> t -> t
+val make_number : t -> float -> t
+val make_boolean : t -> bool -> t
+val make_string : t -> string -> t
+val make_byte_string : t -> string -> t
+val int_of_value : t -> int

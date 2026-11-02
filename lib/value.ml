@@ -6,14 +6,12 @@ type t = {
 and storage =
   | Empty
   | Table of (Selector.t, callable) Hashtbl.t
-  | Numeric of number_layout * float
+  | Numeric of float
   | Shared of storage * int
   | Overlay of (Selector.t, callable) Hashtbl.t * storage * int
   | Merge of storage * storage * int
   | Bound of storage * t * (unit -> unit) * int
 and callable = t -> t list -> t
-and number_code = float -> t -> t list -> t
-and number_layout = (Selector.t * number_code) array
 
 let uninitialized () =
   { number = None; methods = Empty; initialized = false }
@@ -36,21 +34,7 @@ let as_number value =
 let missing selector =
   Runtime.error ("method " ^ Selector.describe selector ^ " not found")
 
-(* No per-lookup search closure. Layouts are sorted once when published. *)
-let rec numeric_index (layout : number_layout) (selector : Selector.t)
-    low high =
-  if low > high then -1 else
-  let index = (low + high) / 2 in
-  let key, _ = layout.(index) in
-  if key = selector then index
-  else if key < selector then
-    (numeric_index [@tailcall]) layout selector (index + 1) high
-  else (numeric_index [@tailcall]) layout selector low (index - 1)
-
-let numeric_code layout selector =
-  let index = numeric_index layout selector 0 (Array.length layout - 1) in
-  if index < 0 then missing selector;
-  snd layout.(index)
+let int_of_value value = Number_methods.int_of_number (as_number value)
 
 let depth = function
   | Empty -> 0
@@ -61,8 +45,7 @@ let depth = function
 let rec contains storage selector = match storage with
   | Empty -> false
   | Table table -> Hashtbl.mem table selector
-  | Numeric (layout, _) ->
-      numeric_index layout selector 0 (Array.length layout - 1) >= 0
+  | Numeric _ -> Number_methods.mem selector
   | Shared (base, _) | Bound (base, _, _, _) ->
       (contains [@tailcall]) base selector
   | Overlay (delta, base, _) ->
@@ -70,15 +53,32 @@ let rec contains storage selector = match storage with
   | Merge (later, earlier, _) ->
       contains later selector || (contains [@tailcall]) earlier selector
 
+(* Raw enumeration includes shadowed selectors, possibly more than once.
+   Keep private: consumers must deduplicate before resolving or reporting. *)
+let rec iter_selectors f = function
+  | Empty -> ()
+  | Table table -> Hashtbl.iter (fun selector _ -> f selector) table
+  | Numeric _ -> Number_methods.iter_selectors f
+  | Shared (base, _) | Bound (base, _, _, _) -> iter_selectors f base
+  | Overlay (delta, base, _) ->
+      iter_selectors f base;
+      Hashtbl.iter (fun selector _ -> f selector) delta
+  | Merge (later, earlier, _) ->
+      iter_selectors f earlier;
+      iter_selectors f later
+
+let numeric_code selector =
+  try Number_methods.find selector with Not_found -> missing selector
+
 (* Resolving a binding captures only its lexical payload/environment, never
    the whole overlay chain. Flattening can therefore release hidden methods. *)
 let rec resolve storage selector = match storage with
   | Empty -> missing selector
   | Table table ->
       (try Hashtbl.find table selector with Not_found -> missing selector)
-  | Numeric (layout, capture) ->
-      let code = numeric_code layout selector in
-      (fun env args -> (code [@tailcall]) capture env args)
+  | Numeric capture ->
+      let code = numeric_code selector in
+      (fun env args -> (apply_number [@tailcall]) code capture env args)
   | Shared (base, _) -> (resolve [@tailcall]) base selector
   | Overlay (delta, base, _) ->
       (match Hashtbl.find delta selector with
@@ -91,17 +91,88 @@ let rec resolve storage selector = match storage with
       let body = resolve base selector in
       (fun _ args -> before (); (body [@tailcall]) env args)
 
-let rec iter_selectors f = function
-  | Empty -> ()
-  | Table table -> Hashtbl.iter (fun selector _ -> f selector) table
-  | Numeric (layout, _) -> Array.iter (fun (selector, _) -> f selector) layout
-  | Shared (base, _) | Bound (base, _, _, _) -> iter_selectors f base
+and invoke storage selector env args = match storage with
+  | Empty -> missing selector
+  | Table table ->
+      let body = try Hashtbl.find table selector
+        with Not_found -> missing selector in
+      (body [@tailcall]) env args
+  | Numeric capture ->
+      let code = numeric_code selector in
+      (apply_number [@tailcall]) code capture env args
+  | Shared (base, _) -> (invoke [@tailcall]) base selector env args
   | Overlay (delta, base, _) ->
-      iter_selectors f base;
-      Hashtbl.iter (fun selector _ -> f selector) delta
+      (match Hashtbl.find delta selector with
+       | body -> (body [@tailcall]) env args
+       | exception Not_found -> (invoke [@tailcall]) base selector env args)
   | Merge (later, earlier, _) ->
-      iter_selectors f earlier;
-      iter_selectors f later
+      (invoke [@tailcall])
+        (if contains later selector then later else earlier) selector env args
+  | Bound (base, bound_env, before, _) ->
+      (* Missing methods fail before the diagnostic/environment callback. *)
+      if not (contains base selector) then missing selector;
+      before ();
+      (invoke [@tailcall]) base selector bound_env args
+
+and apply_number code capture env args =
+  match code with
+  | Number_methods.Unary op -> make_number env (op capture)
+  | Binary op -> make_number env (op capture (as_number (List.hd args)))
+  | Comparison op -> make_boolean env (op capture (as_number (List.hd args)))
+  | To_string -> make_string env (Number_methods.string_of_number capture)
+
+and extend env selector value =
+  ensure_initialized env;
+  let core = resolve env.methods Native_selectors.id_core_0 env [] in
+  ensure_initialized core;
+  let extension = resolve core.methods Native_selectors.id_extend_0 env [] in
+  ensure_initialized extension;
+  resolve extension.methods selector env [value]
+
+and make_number env number =
+  let value =
+    { number = Some number; methods = Numeric number; initialized = true }
+  in
+  extend env Native_selectors.id_number_1 value
+
+and make_boolean env bool =
+  let table = Hashtbl.create 16 in
+  Hashtbl.add table Native_selectors.id_then_else_2 (fun _ values ->
+    match values with
+    | [a; b] -> if bool then a else b
+    | _ -> invalid_arg "wrong arity");
+  let value = { number = None; methods = Table table; initialized = true } in
+  extend env Native_selectors.id_boolean_1 value
+
+and make_string env text =
+  let codes = Dynarray.create () in
+  let rec read i =
+    if i < String.length text then (
+      let decoded = String.get_utf_8_uchar text i in
+      if not (Uchar.utf_decode_is_valid decoded) then
+        invalid_arg ("invalid UTF-8 string at byte " ^ string_of_int i);
+      let code = Uchar.utf_decode_uchar decoded |> Uchar.to_int in
+      Dynarray.add_last codes code;
+      read (i + Uchar.utf_decode_length decoded))
+  in
+  read 0;
+  make_string_codes env (Dynarray.to_array codes)
+
+and make_byte_string env text =
+  make_string_codes env (Utf8.lossless text)
+
+and make_string_codes env codes =
+  let array = Array.map (fun code -> make_number env (float code)) codes in
+  let size = make_number env (float (Array.length array)) in
+  let table = Hashtbl.create 16 in
+  Hashtbl.add table Native_selectors.id_at_1 (fun _ args ->
+    let index = List.hd args |> int_of_value in
+    if index < 0 || index >= Array.length array then
+      Runtime.error ("index out of bounds: " ^ string_of_int index);
+    array.(index));
+  Hashtbl.add table Native_selectors.id_size_0 (fun _ _ -> size);
+  let value = { number = None; methods = Table table; initialized = true } in
+  extend env Native_selectors.id_string_1 value
 
 (* Limit both lookup depth and the lifetime of overridden capture groups.
    Only completed objects are shared. An object's current Table/Overlay delta
@@ -141,29 +212,6 @@ let add_methods into from =
       into.methods <- bounded
         (Merge (source, previous, 1 + max (depth source) (depth previous)))
 
-let rec invoke storage selector env args = match storage with
-  | Empty -> missing selector
-  | Table table ->
-      let body = try Hashtbl.find table selector
-        with Not_found -> missing selector in
-      (body [@tailcall]) env args
-  | Numeric (layout, capture) ->
-      let code = numeric_code layout selector in
-      (code [@tailcall]) capture env args
-  | Shared (base, _) -> (invoke [@tailcall]) base selector env args
-  | Overlay (delta, base, _) ->
-      (match Hashtbl.find delta selector with
-       | body -> (body [@tailcall]) env args
-       | exception Not_found -> (invoke [@tailcall]) base selector env args)
-  | Merge (later, earlier, _) ->
-      (invoke [@tailcall])
-        (if contains later selector then later else earlier) selector env args
-  | Bound (base, bound_env, before, _) ->
-      (* Missing methods fail before the diagnostic/environment callback. *)
-      if not (contains base selector) then missing selector;
-      before ();
-      (invoke [@tailcall]) base selector bound_env args
-
 let invoke_id value selector env args =
   ensure_initialized value;
   (invoke [@tailcall]) value.methods selector env args
@@ -174,18 +222,6 @@ let get_method_id value selector =
 
 let get_method value name arity =
   get_method_id value (Selector.intern name arity)
-
-let create_number_layout methods =
-  let layout = Array.copy methods in
-  Array.sort (fun (a, _) (b, _) -> compare a b) layout;
-  Array.iteri (fun i (selector, _) ->
-    if i > 0 && fst layout.(i - 1) = selector then
-      invalid_arg "duplicate selector in numeric layout") layout;
-  layout
-
-let number_from_layout layout capture =
-  { number = Some capture; methods = Numeric (layout, capture);
-    initialized = true }
 
 let initialize value = value.initialized <- true
 let finish value = initialize value; value

@@ -1,7 +1,7 @@
 open Troopl
 
-(* A separate process ensures the layout starts unpublished. Each domain owns
-   its guest environment and mutable hook state; only internal metadata shares. *)
+(* The descriptor table is eager and immutable. Each domain owns its guest
+   environment and mutable hook state; only internal metadata shares. *)
 let () =
   let ready = Atomic.make 0 and start = Atomic.make false in
   let workers = Array.init 4 (fun _ -> Domain.spawn (fun () ->
@@ -29,4 +29,4 @@ let () =
   while Atomic.get ready < Array.length workers do Domain.cpu_relax () done;
   Atomic.set start true;
   Array.iter Domain.join workers;
-  print_endline "4 concurrent first-construction domains; 40000 hooks preserved"
+  print_endline "4 concurrent numeric-construction domains; 40000 hooks preserved"
