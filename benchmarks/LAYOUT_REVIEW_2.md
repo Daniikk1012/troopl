@@ -6,18 +6,23 @@ independent meta/private-key/control branches.
 
 ## Numeric storage and eager initialization
 
-`Numeric` now stores only the original `float`. `Number_methods` owns one
-sorted operation table, constructed eagerly during module initialization.
+`Numeric` now stores only the original `float`. `Value` owns one sorted table
+of shared numeric method bodies, initialized eagerly when the module loads.
 There is no numeric-layout pointer per object, lazy cache, atomic read, mutex,
 registration API, or guest-value cache. The former arbitrary numeric-layout
 prototype API was used only by tests; it has been removed.
 
-The descriptor table contains pure arithmetic/comparison operations and a
-conversion marker. `Value` applies these descriptors and constructs primitive
-results. `Builtins` retains its public constructor API as aliases. Keeping
-primitive construction with dispatch breaks the former Value/Builtins cycle
-without recursive modules or runtime initialization callbacks. No guest code
-runs while the shared table is built.
+Static recursive values tie the callable table to primitive constructors;
+its entries are closures, so constructing the table does not run their bodies.
+The private array is sorted once before module initialization completes and
+never mutated afterward. OCaml explicitly supports this kind of
+[statically constructive recursive value](https://ocaml.org/manual/5.3/letrecvalues.html).
+
+Primitive construction lives with dispatch to avoid a Value/Builtins dependency
+cycle. `Builtins` retains its public constructor API as aliases, and
+`Number_format` contains the representation-formatting helpers. The lookup
+wrapper captures only the selected shared body and its original numeric value.
+No guest code or extension hook runs while the table is initialized.
 
 Every numeric, boolean, and string result still passes through its active
 environment's extension hook. Strings construct character numbers from left

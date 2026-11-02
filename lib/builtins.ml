@@ -5,7 +5,7 @@ let make_number = Value.make_number
 let make_string = Value.make_string
 let make_byte_string = Value.make_byte_string
 let int_of_value = Value.int_of_value
-let string_of_number = Number_methods.string_of_number
+let string_of_number = Number_format.string_of_number
 
 let size_of_value env value =
   let result =

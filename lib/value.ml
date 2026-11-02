@@ -35,7 +35,7 @@ let as_number value =
 let missing selector =
   Runtime.error ("method " ^ Selector.describe selector ^ " not found")
 
-let int_of_value value = Number_methods.int_of_number (as_number value)
+let int_of_value value = Number_format.int_of_number (as_number value)
 
 let depth = function
   | Empty -> 0
@@ -46,11 +46,71 @@ let depth = function
   | Bound (_, _, _, depth) ->
       depth
 
-let rec contains storage selector =
+(* These shared bodies capture no guest object. Static recursive values let
+   them call primitive constructors without a lazy cache or registration API.
+   Numeric stores only the original lexical float, never an implicit receiver. *)
+let rec number_methods =
+  [|
+    ( Native_selectors.id_add_1,
+      fun n env args -> make_number env (n +. as_number (List.hd args)) );
+    ( Native_selectors.id_subtract_1,
+      fun n env args -> make_number env (n -. as_number (List.hd args)) );
+    ( Native_selectors.id_multiply_1,
+      fun n env args -> make_number env (n *. as_number (List.hd args)) );
+    ( Native_selectors.id_divide_1,
+      fun n env args -> make_number env (n /. as_number (List.hd args)) );
+    ( Native_selectors.id_remainder_1,
+      fun n env args -> make_number env (mod_float n (as_number (List.hd args)))
+    );
+    ( Native_selectors.id_power_1,
+      fun n env args -> make_number env (Float.pow n (as_number (List.hd args)))
+    );
+    ( Native_selectors.id_modulo_1,
+      fun n env args ->
+        let divisor = Float.abs (as_number (List.hd args)) in
+        let remainder = mod_float n divisor in
+        make_number env
+          (if remainder < 0. then remainder +. divisor else remainder) );
+    ( Native_selectors.id_equal_1,
+      fun n env args -> make_boolean env (n = as_number (List.hd args)) );
+    ( Native_selectors.id_not_equal_1,
+      fun n env args -> make_boolean env (n <> as_number (List.hd args)) );
+    ( Native_selectors.id_less_1,
+      fun n env args -> make_boolean env (n < as_number (List.hd args)) );
+    ( Native_selectors.id_greater_1,
+      fun n env args -> make_boolean env (n > as_number (List.hd args)) );
+    ( Native_selectors.id_less_equal_1,
+      fun n env args -> make_boolean env (n <= as_number (List.hd args)) );
+    ( Native_selectors.id_greater_equal_1,
+      fun n env args -> make_boolean env (n >= as_number (List.hd args)) );
+    (Native_selectors.id_negate_0, fun n env _ -> make_number env (-.n));
+    (Native_selectors.id_floor_0, fun n env _ -> make_number env (Float.floor n));
+    (Native_selectors.id_ceil_0, fun n env _ -> make_number env (Float.ceil n));
+    (Native_selectors.id_trunc_0, fun n env _ -> make_number env (Float.trunc n));
+    ( Native_selectors.id_to_string_0,
+      fun n env _ -> make_string env (Number_format.string_of_number n) );
+  |]
+
+and numeric_index selector low high =
+  if low > high then -1
+  else
+    let i = (low + high) / 2 in
+    let key, _ = number_methods.(i) in
+    if key = selector then i
+    else if key < selector then
+      (numeric_index [@tailcall]) selector (i + 1) high
+    else (numeric_index [@tailcall]) selector low (i - 1)
+
+and numeric_code selector =
+  let i = numeric_index selector 0 (Array.length number_methods - 1) in
+  if i < 0 then missing selector;
+  snd number_methods.(i)
+
+and contains storage selector =
   match storage with
   | Empty -> false
   | Table table -> Hashtbl.mem table selector
-  | Numeric _ -> Number_methods.mem selector
+  | Numeric _ -> numeric_index selector 0 (Array.length number_methods - 1) >= 0
   | Shared (base, _) | Bound (base, _, _, _) ->
       (contains [@tailcall]) base selector
   | Overlay (delta, base, _) ->
@@ -60,10 +120,10 @@ let rec contains storage selector =
 
 (* Raw enumeration includes shadowed selectors, possibly more than once.
    Keep private: consumers must deduplicate before resolving or reporting. *)
-let rec iter_selectors f = function
+and iter_selectors f = function
   | Empty -> ()
   | Table table -> Hashtbl.iter (fun selector _ -> f selector) table
-  | Numeric _ -> Number_methods.iter_selectors f
+  | Numeric _ -> Array.iter (fun (selector, _) -> f selector) number_methods
   | Shared (base, _) | Bound (base, _, _, _) -> iter_selectors f base
   | Overlay (delta, base, _) ->
       iter_selectors f base;
@@ -72,19 +132,16 @@ let rec iter_selectors f = function
       iter_selectors f earlier;
       iter_selectors f later
 
-let numeric_code selector =
-  try Number_methods.find selector with Not_found -> missing selector
-
 (* Resolving a binding captures only its lexical payload/environment, never
    the whole overlay chain. Flattening can therefore release hidden methods. *)
-let rec resolve storage selector =
+and resolve storage selector =
   match storage with
   | Empty -> missing selector
   | Table table -> (
       try Hashtbl.find table selector with Not_found -> missing selector)
   | Numeric capture ->
       let code = numeric_code selector in
-      fun env args -> (apply_number [@tailcall]) code capture env args
+      fun env args -> (code [@tailcall]) capture env args
   | Shared (base, _) -> (resolve [@tailcall]) base selector
   | Overlay (delta, base, _) -> (
       match Hashtbl.find delta selector with
@@ -110,7 +167,7 @@ and invoke storage selector env args =
       (body [@tailcall]) env args
   | Numeric capture ->
       let code = numeric_code selector in
-      (apply_number [@tailcall]) code capture env args
+      (code [@tailcall]) capture env args
   | Shared (base, _) -> (invoke [@tailcall]) base selector env args
   | Overlay (delta, base, _) -> (
       match Hashtbl.find delta selector with
@@ -125,13 +182,6 @@ and invoke storage selector env args =
       if not (contains base selector) then missing selector;
       before ();
       (invoke [@tailcall]) base selector bound_env args
-
-and apply_number code capture env args =
-  match code with
-  | Number_methods.Unary op -> make_number env (op capture)
-  | Binary op -> make_number env (op capture (as_number (List.hd args)))
-  | Comparison op -> make_boolean env (op capture (as_number (List.hd args)))
-  | To_string -> make_string env (Number_methods.string_of_number capture)
 
 and extend env selector value =
   ensure_initialized env;
@@ -184,6 +234,10 @@ and make_string_codes env codes =
   Hashtbl.add table Native_selectors.id_size_0 (fun _ _ -> size);
   let value = { number = None; methods = Table table; initialized = true } in
   extend env Native_selectors.id_string_1 value
+
+(* Sort once during module initialization, before any guest execution or
+   domain can obtain a Value. The array is private and never mutated again. *)
+let () = Array.sort (fun (a, _) (b, _) -> compare a b) number_methods
 
 (* Limit both lookup depth and the lifetime of overridden capture groups.
    Only completed objects are shared. An object's current Table/Overlay delta
