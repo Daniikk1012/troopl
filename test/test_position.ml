@@ -2,7 +2,7 @@ open Troopl
 
 let test (pos : Position.t) offset line column string =
   assert (pos.offset = offset);
-  assert (pos.line   = line);
+  assert (pos.line = line);
   assert (pos.column = column);
   assert (Position.to_string pos = string)
 

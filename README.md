@@ -48,9 +48,10 @@ runtime may report zero for the GC stack-size field; it is not a stack proof.
 
 ## Contributing
 
-No rules for now except for [style guide](STYLE.md), since `ocamlformat` is not
-used for this project. This might change if this project becomes big enough to
-attract a lot of contributors, but is fine for now.
+- Use `ocamlformat` for formatting (`dune fmt` for project-wide formatting);
+- After applying changes, test them with `dune runtest` before commiting;
+- Try to keep commits small and self-contained, to allow for easy
+  commit-by-commit reviews.
 
 Source files and their responsibilies:
 
@@ -133,3 +134,12 @@ dune exec troopl -- examples/calculator/main.tr
 The calculator parses its own input language; it does not evaluate user input
 as Troopl source. The test suite covers the original 50 examples, Version 0.1
 capabilities, and calculator arithmetic, error recovery, persistence, and CLI IO.
+
+## Shared-storage experiment
+
+This branch refines the shared numeric layout prototype with bounded method
+overlays for inclusion and environment binding. It preserves custom literal
+hooks and lexical method captures, with no implicit self. See the
+[benchmark and validation report](benchmarks/SHARED_LAYOUT_OVERLAYS.md) for
+architecture, reproducible measurements and remaining regressions. This
+experimental representation has not been merged into production.

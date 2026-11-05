@@ -1,0 +1,8 @@
+workload,units,median_seconds,allocated_bytes_per_unit
+override-8,2000,0.000877,548.30
+lookup-8,100000,0.002384,0.00
+override-64,2000,0.004952,1153.51
+lookup-64,100000,0.002924,0.00
+override-512,2000,0.038315,6624.43
+lookup-512,100000,0.002959,0.00
+bind-chain,2000,0.000051,109.86

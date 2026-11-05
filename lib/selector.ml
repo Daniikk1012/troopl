@@ -9,17 +9,25 @@ let mutex = Mutex.create ()
 let intern name arity =
   if arity < 0 then invalid_arg "negative method arity";
   Mutex.lock mutex;
-  Fun.protect ~finally:(fun () -> Mutex.unlock mutex) (fun () ->
-    match Hashtbl.find_opt registry (name, arity) with
-    | Some id -> id
-    | None ->
-        let id = Dynarray.length descriptions in
-        Dynarray.add_last descriptions (name, arity);
-        Hashtbl.add registry (name, arity) id;
-        id)
+  Fun.protect
+    ~finally:(fun () -> Mutex.unlock mutex)
+    (fun () ->
+      match Hashtbl.find_opt registry (name, arity) with
+      | Some id -> id
+      | None ->
+          let id = Dynarray.length descriptions in
+          Dynarray.add_last descriptions (name, arity);
+          Hashtbl.add registry (name, arity) id;
+          id)
+
+let parts id =
+  Mutex.lock mutex;
+  Fun.protect
+    ~finally:(fun () -> Mutex.unlock mutex)
+    (fun () -> Dynarray.get descriptions id)
+
+let name id = fst (parts id)
 
 let describe id =
-  Mutex.lock mutex;
-  Fun.protect ~finally:(fun () -> Mutex.unlock mutex) (fun () ->
-    let name, arity = Dynarray.get descriptions id in
-    name ^ "/" ^ string_of_int arity)
+  let name, arity = parts id in
+  name ^ "/" ^ string_of_int arity

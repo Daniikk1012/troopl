@@ -1,0 +1,5 @@
+workload,retained_objects,live_bytes_per_object_including_array_slot
+native-number,10000,1768.00
+stdlib-number,10000,2944.00
+include-existing-number,10000,800.97
+bind-existing-number,10000,1815.92

@@ -1,11 +1,37 @@
 (tests
- (names test_troopl test_position test_lexer test_parser test_lowerer
-        test_evaluator test_examples test_environment test_stdlib test_cli
-        test_specification test_calculator test_v02 test_optimization test_layout)
- (modules (:standard \ process_child benchmark))
+ (names
+  test_troopl
+  test_position
+  test_lexer
+  test_parser
+  test_lowerer
+  test_evaluator
+  test_examples
+  test_environment
+  test_stdlib
+  test_cli
+  test_specification
+  test_calculator
+  test_v02
+  test_optimization
+  test_layout
+  test_layout_storage
+  test_layout_domains
+  test_layout_review)
+ (modules
+  (:standard
+   \
+   process_child
+   benchmark
+   benchmark_pure
+   benchmark_layout
+   benchmark_storage))
  (libraries troopl unix)
- (deps (source_tree ../examples) (source_tree ../stdlib) ../bin/main.exe
-       process_child.exe))
+ (deps
+  (source_tree ../examples)
+  (source_tree ../stdlib)
+  ../bin/main.exe
+  process_child.exe))
 
 (executable
  (name process_child)
@@ -15,4 +41,19 @@
 (executable
  (name benchmark)
  (modules benchmark)
+ (libraries troopl unix))
+
+(executable
+ (name benchmark_layout)
+ (modules benchmark_layout)
+ (libraries troopl unix))
+
+(executable
+ (name benchmark_pure)
+ (modules benchmark_pure)
+ (libraries troopl unix))
+
+(executable
+ (name benchmark_storage)
+ (modules benchmark_storage)
  (libraries troopl unix))
