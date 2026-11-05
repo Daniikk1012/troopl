@@ -5,6 +5,10 @@ Measured 2026-10-30. This remains an independent experimental branch,
 It does not merge the layout prototype into production or include the
 separate optional language-capability branches.
 
+The later [consolidated-review comparison](REVIEW_LAYOUTS.md) checks the
+selector/IR/capture cleanups against this exact overlay head, with raw final
+measurements, run-order variation and retained-heap samples.
+
 ## Representation and semantics
 
 Native numbers keep the original prototype's immutable selector/code layout

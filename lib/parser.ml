@@ -5,14 +5,15 @@ exception Error of string * Position.t
 let advance parser = parser.token <- Lexer.next_token parser.lexer
 
 let expected message parser =
-  raise (Error (
-    "unexpected token " ^ Token.string_of_kind parser.token.kind ^ ", expected "
-      ^ message,
-    parser.token.pos))
+  raise
+    (Error
+       ( "unexpected token "
+         ^ Token.string_of_kind parser.token.kind
+         ^ ", expected " ^ message,
+         parser.token.pos ))
 
 let expect kind parser =
-  if parser.token.kind = kind then
-    advance parser
+  if parser.token.kind = kind then advance parser
   else expected (Token.string_of_kind kind) parser
 
 let is_value_start (kind : Token.kind) =
@@ -53,9 +54,15 @@ let rec parse_statements parser : Expression.t =
 
 and parse_value parser =
   match parser.token with
-  | { kind = Variable v; pos } -> advance parser; { kind = Variable v; pos }
-  | { kind = Number   n; pos } -> advance parser; { kind = Number   n; pos }
-  | { kind = String   s; pos } -> advance parser; { kind = String   s; pos }
+  | { kind = Variable v; pos } ->
+      advance parser;
+      { kind = Variable v; pos }
+  | { kind = Number n; pos } ->
+      advance parser;
+      { kind = Number n; pos }
+  | { kind = String s; pos } ->
+      advance parser;
+      { kind = String s; pos }
   | { kind = OpenParen } ->
       advance parser;
       let expr = parse_statements parser in
@@ -65,8 +72,9 @@ and parse_value parser =
       let pos = parser.token.pos in
       let entries = parse_object_like parser in
       { kind = Object entries; pos }
-  | _ -> expected
-      "Variable, Number, String, OpenParen, OpenObject, or OpenBlock" parser
+  | _ ->
+      expected "Variable, Number, String, OpenParen, OpenObject, or OpenBlock"
+        parser
 
 and parse_object_like parser =
   match parser.token with
@@ -79,12 +87,12 @@ and parse_object_like parser =
       advance parser;
       let body = parse_statements parser in
       expect CloseBlock parser;
-      [{ kind = Method { name = "run"; args = []; body }; pos }]
+      [ { kind = Method { name = "run"; args = []; body }; pos } ]
   | _ -> expected "OpenObject or OpenBlock" parser
 
 and parse_entries parser =
   match parser.token with
-  | { kind = Method name; pos } -> 
+  | { kind = Method name; pos } ->
       advance parser;
       let args = parse_args parser in
       let body = parse_value parser in
@@ -101,7 +109,9 @@ and parse_entries parser =
 
 and parse_args parser =
   match parser.token.kind with
-  | Variable name -> advance parser; name :: parse_args parser
+  | Variable name ->
+      advance parser;
+      name :: parse_args parser
   | _ -> []
 
 and parse_call value parser =
@@ -114,7 +124,8 @@ and parse_call value parser =
 
 and parse_values parser =
   if is_value_start parser.token.kind then
-    let value = parse_value parser in value :: parse_values parser
+    let value = parse_value parser in
+    value :: parse_values parser
   else []
 
 let parse_program parser =

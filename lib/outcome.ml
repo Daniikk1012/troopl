@@ -13,8 +13,10 @@ let failure ?(fields = []) env message =
   let message = Builtins.make_byte_string env message in
   Value.add_method_id result Native_selectors.id_ok__0 (fun _ _ -> no);
   Value.add_method_id result Native_selectors.id_message_0 (fun _ _ -> message);
-  List.iter (fun (name, value) ->
-    Value.add_method result name 0 (fun _ _ -> value)) fields;
+  List.iter
+    (fun (selector, value) ->
+      Value.add_method_id result selector (fun _ _ -> value))
+    fields;
   Value.finish result
 
 let attempt env f =
@@ -22,6 +24,7 @@ let attempt env f =
   | Sys_error message -> failure env message
   | Unix.Unix_error (error, operation, argument) ->
       let message = operation ^ ": " ^ Unix.error_message error in
-      let message = if argument = "" then message else
-        message ^ " (" ^ argument ^ ")" in
+      let message =
+        if argument = "" then message else message ^ " (" ^ argument ^ ")"
+      in
       failure env message

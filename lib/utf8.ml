@@ -1,4 +1,5 @@
-(** Decode complete scalar values; leave a valid unfinished suffix untouched. *)
+(** Decode complete scalars; leave a valid unfinished suffix untouched. *)
+
 type decoded = {
   text : string;
   consumed : int;
@@ -12,7 +13,8 @@ let decode ~size ~get =
   in
   let invalid i byte = result i (Some (i, byte, "invalid UTF-8 byte")) in
   let rec loop i =
-    if i = size then result i None else
+    if i = size then result i None
+    else
       let first = get i in
       if first >= 0 && first <= 0x7f then (
         Buffer.add_char buffer (Char.chr first);
@@ -36,16 +38,18 @@ let decode ~size ~get =
               if j = count then (
                 List.rev bytes
                 |> List.iter (fun byte ->
-                  Buffer.add_char buffer (Char.chr byte));
+                    Buffer.add_char buffer (Char.chr byte));
                 loop (i + count))
               else if i + j = size then result i None
               else
                 let byte = get (i + j) in
-                let lower, upper = if j = 1 then low, high else 0x80, 0xbf in
+                let lower, upper =
+                  if j = 1 then (low, high) else (0x80, 0xbf)
+                in
                 if byte < lower || byte > upper then invalid i first
                 else continuation (j + 1) (byte :: bytes)
             in
-            continuation 1 [first]
+            continuation 1 [ first ]
   in
   loop 0
 
@@ -53,15 +57,14 @@ let decode ~size ~get =
 let lossless text =
   let codes = Dynarray.create () in
   let rec loop i =
-    if i < String.length text then (
+    if i < String.length text then
       let decoded = String.get_utf_8_uchar text i in
       if Uchar.utf_decode_is_valid decoded then (
-        Dynarray.add_last codes
-          (Uchar.to_int (Uchar.utf_decode_uchar decoded));
+        Dynarray.add_last codes (Uchar.to_int (Uchar.utf_decode_uchar decoded));
         loop (i + Uchar.utf_decode_length decoded))
       else (
         Dynarray.add_last codes (-Char.code text.[i]);
-        loop (i + 1)))
+        loop (i + 1))
   in
   loop 0;
   Dynarray.to_array codes
