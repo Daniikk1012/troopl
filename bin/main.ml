@@ -1,8 +1,7 @@
 open Troopl
 
 let report category message position =
-  prerr_endline
-    (Position.describe position ^ ": " ^ category ^ ": " ^ message);
+  prerr_endline (Position.describe position ^ ": " ^ category ^ ": " ^ message);
   exit 1
 
 let () =
@@ -18,11 +17,10 @@ let () =
     in
     let arguments = Array.to_list Sys.argv |> List.tl in
     let env = Env.make ~filename ~arguments () in
-    Evaluator.eval lowered.scope_size env lowered.ir
-    |> ignore
+    Evaluator.eval lowered.scope_size env lowered.ir |> ignore
   with
-  | Lexer.Error   (message, pos) -> report "LEXER ERROR" message pos
-  | Parser.Error  (message, pos) -> report "PARSER ERROR" message pos
+  | Lexer.Error (message, pos) -> report "LEXER ERROR" message pos
+  | Parser.Error (message, pos) -> report "PARSER ERROR" message pos
   | Lowerer.Error (message, pos) -> report "LOWERING ERROR" message pos
   | Runtime.Error (message, pos) -> report "RUNTIME ERROR" message pos
   | Sys_error message ->

@@ -1,5 +1,4 @@
 type t = { map : (string, int * Position.t) Hashtbl.t; mutable index : int }
-
 type lowered = { ir : Ir.t; scope_size : int }
 
 exception Error of string * Position.t
@@ -17,7 +16,7 @@ let get_var lowerer name pos =
 
 let rec lower_expr lowerer (expr : Expression.t) =
   match expr.kind with
-  | Definition { name; value; scope } -> (
+  | Definition { name; value; scope } ->
       let value = lower_expr lowerer value in
       let old = Hashtbl.find_opt lowerer.map name in
       Hashtbl.remove lowerer.map name;
@@ -25,12 +24,12 @@ let rec lower_expr lowerer (expr : Expression.t) =
       let ir : Ir.t =
         match Hashtbl.find_opt lowerer.map name with
         | Some (index, _) -> Definition { index; value; scope }
-        | None            -> Sequence (value, scope)
+        | None -> Sequence (value, scope)
       in
       Hashtbl.remove lowerer.map name;
       Option.iter (Hashtbl.add lowerer.map name) old;
-      ir)
-  | RecursiveDefinition { name; entries; scope } -> (
+      ir
+  | RecursiveDefinition { name; entries; scope } ->
       let old = Hashtbl.find_opt lowerer.map name in
       Hashtbl.remove lowerer.map name;
       let entries = List.map (lower_entry lowerer) entries in
@@ -38,11 +37,11 @@ let rec lower_expr lowerer (expr : Expression.t) =
       let ir : Ir.t =
         match Hashtbl.find_opt lowerer.map name with
         | Some (index, _) -> RecursiveDefinition { index; entries; scope }
-        | None            -> Sequence (Object entries, scope)
+        | None -> Sequence (Object entries, scope)
       in
       Hashtbl.remove lowerer.map name;
       Option.iter (Hashtbl.add lowerer.map name) old;
-      ir)
+      ir
   | Sequence (a, b) ->
       let a = lower_expr lowerer a in
       let b = lower_expr lowerer b in
@@ -54,9 +53,14 @@ let rec lower_expr lowerer (expr : Expression.t) =
   | Environment -> Environment
   | Call { value; name; args } ->
       let value = lower_expr lowerer value in
-      let args  = List.map (lower_expr lowerer) args in
-      Call { value; selector = Selector.intern name (List.length args);
-        args; pos = expr.pos }
+      let args = List.map (lower_expr lowerer) args in
+      Call
+        {
+          value;
+          selector = Selector.intern name (List.length args);
+          args;
+          pos = expr.pos;
+        }
 
 and lower_entry lowerer entry =
   match entry.kind with
@@ -65,10 +69,9 @@ and lower_entry lowerer entry =
       List.iteri
         (fun i s ->
           if Hashtbl.mem indices s then
-            raise (Error
-              ("duplicate argument names in method definition", entry.pos))
-          else
-            Hashtbl.add indices s i)
+            raise
+              (Error ("duplicate argument names in method definition", entry.pos))
+          else Hashtbl.add indices s i)
         args;
       let lowerer' = create () in
       let body = lower_expr lowerer' body in
@@ -76,9 +79,11 @@ and lower_entry lowerer entry =
       let captures =
         Hashtbl.to_seq lowerer'.map
         |> Seq.filter_map (fun (s, (i, p)) : Ir.capture option ->
-             match Hashtbl.find_opt indices s with
-             | Some i' -> args.(i') <- Some i; None
-             | None -> Some { outer = get_var lowerer s p; inner = i })
+            match Hashtbl.find_opt indices s with
+            | Some i' ->
+                args.(i') <- Some i;
+                None
+            | None -> Some { outer = get_var lowerer s p; inner = i })
         |> List.of_seq
       in
       let args = Array.to_list args in
