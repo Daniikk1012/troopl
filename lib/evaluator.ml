@@ -37,8 +37,7 @@ let rec eval_ir locals captured env : Ir.t -> _ = function
       Value.ensure_initialized value;
       let args = List.map (eval_ir locals captured env) args in
       Diagnostics.locate env pos;
-      let method_ = Value.get_method_id value selector in
-      (method_ [@tailcall]) env args
+      (Value.invoke_id [@tailcall]) value selector env args
 
 (* This factory receives capture values, never the parent's local frame.
    A zero-capture method cannot accidentally retain that frame. *)

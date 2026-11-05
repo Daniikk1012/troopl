@@ -1,86 +1,11 @@
 let finish = Value.finish
-
-let extend env selector value =
-  let core = Value.get_method_id env Native_selectors.id_core_0 env [] in
-  let extension =
-    Value.get_method_id core Native_selectors.id_extend_0 env []
-  in
-  Value.get_method_id extension selector env [ value ]
-
-let arithmetic =
-  List.map
-    (fun (name, op) -> (Selector.intern name 1, op))
-    [
-      ("+", ( +. ));
-      ("-", ( -. ));
-      ("*", ( *. ));
-      ("/", ( /. ));
-      ( "mod",
-        fun a b ->
-          let divisor = Float.abs b in
-          let remainder = mod_float a divisor in
-          if remainder < 0. then remainder +. divisor else remainder );
-      ("rem", mod_float);
-      ("^", Float.pow);
-    ]
-
-let comparisons =
-  List.map
-    (fun (name, op) -> (Selector.intern name 1, op))
-    [
-      ("=", ( = ));
-      ("<>", ( <> ));
-      ("<", ( < ));
-      (">", ( > ));
-      ("<=", ( <= ));
-      (">=", ( >= ));
-    ]
-
-let rounding =
-  List.map
-    (fun (name, op) -> (Selector.intern name 0, op))
-    [ ("floor", Float.floor); ("ceil", Float.ceil); ("trunc", Float.trunc) ]
-
-let expand_decimal text =
-  match String.index_opt text 'e' with
-  | None -> text
-  | Some i ->
-      let mantissa = String.sub text 0 i in
-      let exponent =
-        String.sub text (i + 1) (String.length text - i - 1) |> int_of_string
-      in
-      let point =
-        Option.value
-          (String.index_opt mantissa '.')
-          ~default:(String.length mantissa)
-      in
-      let digits = String.concat "" (String.split_on_char '.' mantissa) in
-      let point = point + exponent in
-      if point <= 0 then "0." ^ String.make (-point) '0' ^ digits
-      else if point >= String.length digits then
-        digits ^ String.make (point - String.length digits) '0'
-      else
-        String.sub digits 0 point ^ "."
-        ^ String.sub digits point (String.length digits - point)
-
-let string_of_number number =
-  if Float.is_nan number then "0nan"
-  else if number = infinity then "0inf"
-  else if number = neg_infinity then "0inf-"
-  else
-    let text = Printf.sprintf "%.17g" (Float.abs number) |> expand_decimal in
-    let text =
-      if String.ends_with ~suffix:"." text then
-        String.sub text 0 (String.length text - 1)
-      else text
-    in
-    if Float.sign_bit number then text ^ "-" else text
-
-let int_of_value value =
-  let n = Value.as_number value in
-  if (not (Float.is_integer n)) || n < float min_int || n >= float max_int then
-    Runtime.error ("expected a finite integer: " ^ string_of_number n);
-  int_of_float n
+let extend = Value.extend
+let make_boolean = Value.make_boolean
+let make_number = Value.make_number
+let make_string = Value.make_string
+let make_byte_string = Value.make_byte_string
+let int_of_value = Value.int_of_value
+let string_of_number = Number_format.string_of_number
 
 let size_of_value env value =
   let result =
@@ -90,67 +15,6 @@ let size_of_value env value =
   let size = int_of_value result in
   if size < 0 then Runtime.error ("invalid size " ^ string_of_int size);
   size
-
-let make_boolean env bool =
-  let value = Value.uninitialized () in
-  Value.add_method_id value Native_selectors.id_then_else_2 (fun _ values ->
-      match values with
-      | [ a; b ] -> if bool then a else b
-      | _ -> invalid_arg "wrong arity");
-  extend env Native_selectors.id_boolean_1 (finish value)
-
-let rec make_number env number =
-  let value = Value.uninitialized () in
-  Value.set_number value number;
-  List.iter
-    (fun (selector, operation) ->
-      Value.add_method_id value selector (fun env values ->
-          operation number (List.hd values |> Value.as_number)
-          |> make_number env))
-    arithmetic;
-  Value.add_method_id value Native_selectors.id_negate_0 (fun env _ ->
-      make_number env (-.number));
-  List.iter
-    (fun (selector, compare) ->
-      Value.add_method_id value selector (fun env values ->
-          compare number (List.hd values |> Value.as_number) |> make_boolean env))
-    comparisons;
-  List.iter
-    (fun (selector, operation) ->
-      Value.add_method_id value selector (fun env _ ->
-          operation number |> make_number env))
-    rounding;
-  Value.add_method_id value Native_selectors.id_to_string_0 (fun env _ ->
-      make_string env (string_of_number number));
-  extend env Native_selectors.id_number_1 (finish value)
-
-and make_string env text =
-  let codes = Dynarray.create () in
-  let rec read i =
-    if i < String.length text then (
-      let decoded = String.get_utf_8_uchar text i in
-      if not (Uchar.utf_decode_is_valid decoded) then
-        invalid_arg ("invalid UTF-8 string at byte " ^ string_of_int i);
-      let code = Uchar.utf_decode_uchar decoded |> Uchar.to_int in
-      Dynarray.add_last codes code;
-      read (i + Uchar.utf_decode_length decoded))
-  in
-  read 0;
-  make_string_codes env (Dynarray.to_array codes)
-
-and make_byte_string env text = make_string_codes env (Utf8.lossless text)
-
-and make_string_codes env codes =
-  let array = Array.map (fun code -> make_number env (float code)) codes in
-  let size = make_number env (float (Array.length array)) in
-  let value = Value.uninitialized () in
-  Value.add_method_id value Native_selectors.id_at_1 (fun _ args ->
-      let index = List.hd args |> int_of_value in
-      if index < 0 || index >= Array.length array then
-        Runtime.error ("index out of bounds: " ^ string_of_int index);
-      array.(index));
-  Value.add_method_id value Native_selectors.id_size_0 (fun _ _ -> size);
-  extend env Native_selectors.id_string_1 (finish value)
 
 let minimal_list env values =
   let array = values in
