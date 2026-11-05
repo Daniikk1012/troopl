@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-02",
+  "baseline": "8f6b859",
+  "final_source": "8cdfdf0",
+  "partial": "prepare_partial_flatten.py applied to 8cdfdf0",
+  "compiler": "OCaml 5.3.0 native",
+  "dune": "3.24.0 bootstrap",
+  "platform": "Cygwin on Windows",
+  "samples_per_batch": 5,
+  "warmups": 1,
+  "run_order": [
+    "before-first",
+    "after-first",
+    "partial-first",
+    "partial-reverse",
+    "after-reverse",
+    "before-reverse"
+  ],
+  "intermediate": {
+    "intermediate": "31b770b; partial4a17107",
+    "intermediate-search": "a209af2"
+  }
+}

@@ -1,5 +1,8 @@
 (library
  (name troopl)
  (libraries uucp unix threads)
- (foreign_stubs (language c) (names signal_stubs))
- (flags (:standard -w +51 -warn-error +51)))
+ (foreign_stubs
+  (language c)
+  (names signal_stubs))
+ (flags
+  (:standard -w +51 -warn-error +51)))

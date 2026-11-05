@@ -3,17 +3,21 @@ type location = Local of int | Capture of int
 type capture_plan = ReuseCaptures | CaptureValues of location array
 
 type t =
-  | Definition          of { index : int; value : t; scope : t }
+  | Definition of { index : int; value : t; scope : t }
   | RecursiveDefinition of { index : int; entries : entry list; scope : t }
-  | Sequence            of t * t
-  | Object              of entry list
-  | Variable            of int
-  | Captured            of int
-  | Number              of float * Position.t
-  | String              of string * Position.t
+  | Sequence of t * t
+  | Object of entry list
+  | Variable of int
+  | Captured of int
+  | Number of float * Position.t
+  | String of string * Position.t
   | Environment
-  | Call of { value : t; selector : Selector.t;
-              args : t list; pos : Position.t }
+  | Call of {
+      value : t;
+      selector : Selector.t;
+      args : t list;
+      pos : Position.t;
+    }
 
 and entry =
   | CompiledMethod of {
@@ -24,10 +28,10 @@ and entry =
       scope_size : int;
     }
   | Method of {
-      name       : string;
-      args       : int option list;
-      body       : t;
-      captures   : capture list;
+      name : string;
+      args : int option list;
+      body : t;
+      captures : capture list;
       scope_size : int;
     }
   | Inclusion of { value : t; pos : Position.t }
@@ -41,8 +45,8 @@ let rec to_string = function
       ^ to_string scope ^ ")"
   | RecursiveDefinition { index; entries; scope } ->
       "RecursiveDefinition " ^ string_of_int index ^ " = ["
-      ^ String.concat "; " (List.map string_of_entry entries) ^ "] in ("
-      ^ to_string scope ^ ")"
+      ^ String.concat "; " (List.map string_of_entry entries)
+      ^ "] in (" ^ to_string scope ^ ")"
   | Sequence (a, b) -> "Sequence (" ^ to_string a ^ ") (" ^ to_string b ^ ")"
   | Object entries ->
       "Object [" ^ String.concat "; " (List.map string_of_entry entries) ^ "]"
@@ -60,19 +64,20 @@ let rec to_string = function
 
 and string_of_entry = function
   | CompiledMethod { selector; body; plan; scope_size; _ } ->
-      let plan = match plan with
+      let plan =
+        match plan with
         | ReuseCaptures -> "reuse"
         | CaptureValues sources ->
             "gather:" ^ string_of_int (Array.length sources)
       in
-      "CompiledMethod " ^ Selector.describe selector ^ " " ^ plan
-      ^ " locals:" ^ string_of_int scope_size ^ " " ^ to_string body
+      "CompiledMethod " ^ Selector.describe selector ^ " " ^ plan ^ " locals:"
+      ^ string_of_int scope_size ^ " " ^ to_string body
   | Method { name; args; body; captures; scope_size } ->
       "Method " ^ name ^ " ["
       ^ String.concat "; "
           (List.map
-            (fun o -> Option.map string_of_int o |> Option.value ~default:"-")
-            args)
+             (fun o -> Option.map string_of_int o |> Option.value ~default:"-")
+             args)
       ^ "] = (" ^ to_string body ^ ") capturing ["
       ^ String.concat "; " (List.map string_of_capture captures)
       ^ "] scope_size = " ^ string_of_int scope_size
