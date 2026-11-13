@@ -44,8 +44,7 @@ let retained name count operation =
   ignore (Sys.opaque_identity held)
 
 let () =
-  let library = eval base (read "stdlib/stdlib.tr") in
-  let std = call base library "extend" [ base ] in
+  let std = eval base (read "stdlib/stdlib.tr") in
   let factory = eval base "N 1 F {run {N}} F" in
   let include_number = Value.get_method factory "run" 0 in
   let number = Builtins.make_number base 1. in

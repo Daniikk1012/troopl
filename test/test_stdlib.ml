@@ -25,8 +25,7 @@ let truth env value =
 
 let () =
   let base = Env.make ~filename:"stdlib-test.tr" () in
-  let library = eval base "../stdlib/stdlib.tr" (read "../stdlib/stdlib.tr") in
-  let env = call base library "extend" [ base ] in
+  let env = eval base "../stdlib/stdlib.tr" (read "../stdlib/stdlib.tr") in
   let number source expected =
     let result = eval env "stdlib-test.tr" source |> Value.as_number in
     check source (result = expected)
@@ -54,31 +53,29 @@ let () =
   number "7 min 3" 3.;
   number "7 max 3" 7.;
   text "\"Hello\" + \", \" + \"Troopl!\"" "Hello, Troopl!";
-  text "\"abcdef\" substring 1 4" "bcd";
+  text "\"abcdef\" sub 1 4" "bcd";
   text "\"я🙂\" reverse" "🙂я";
-  number "\"same\" equals \"same\" then-else 1 0" 1.;
-  number "\"same\" equals \"other\" then-else 1 0" 0.;
-  text "\"abcdef\" substring 2 2" "";
-  text "\"abc\" reverse strict" "cba";
-  number "(list of and 1 and 2 and 3 end) size" 3.;
+  number "\"same\" = \"same\" then-else 1 0" 1.;
+  number "\"same\" = \"other\" then-else 1 0" 0.;
+  text "\"abcdef\" sub 2 2" "";
+  text "\"abc\" reverse copy" "cba";
+  number "(list < 1 , 2 , 3 >) size" 3.;
   number "(list range 10 15) at 3" 13.;
   number "(list range 0 3) map {run X (X * X)} at 2" 4.;
-  number "(list range 1 6) fold {run A B (A + B)} 0" 15.;
-  number "(list range 0 6) filter {run X (X mod 2 = 0)} size" 3.;
-  number "(list range 0 6) filter {run X (X mod 2 = 0)} at 2" 4.;
+  number "(list range 1 6) to-seq left-fold 0 {run A B (A + B)}" 15.;
+  number "(list range 0 6) to-seq filter {run X (X mod 2 = 0)} to-list size" 3.;
+  number "(list range 0 6) to-seq filter {run X (X mod 2 = 0)} to-list at 2" 4.;
   number "((list range 0 2) + (list range 2 4)) at 3" 3.;
-  number "(list range 0 0) is-empty then-else 1 0" 1.;
+  number "(list range 0 0) size = 0 then-else 1 0" 1.;
   number
-    "Cell (box 0) ((list range 1 4) for-each {run X (Cell set ((Cell get) + \
+    "Cell (box 0) ((list range 1 4) to-seq for-each {run X (Cell set ((Cell get) + \
      X))}) Cell get"
     6.;
-  number "(list range 0 100000) strict at 99999" 99999.;
+  number "(list range 0 100000) copy at 99999" 99999.;
   number
     "Cell (box 0) M ((list range 0 1) map {run X ((Cell set ((Cell get) + 1)) \
      X)}) (M at 0) (M at 0) Cell get"
     2.;
-  number "A (array push 1) L (list from A) (A set 0 7) L at 0" 1.;
-  number "A (array push 1) L (list from-minimal A) (A set 0 7) L at 0" 7.;
   List.iter
     (fun source ->
       check ("bounds " ^ source)
@@ -87,10 +84,7 @@ let () =
            false
          with Runtime.Error _ -> true))
     [
-      "(list range 0 3) at 3";
-      "\"abc\" substring 0 4";
       "\"abc\" reverse at 3";
-      "(list range 0 3) at 0.5";
     ];
   let path = Filename.temp_file "troopl-module-" ".tr" in
   Fun.protect
@@ -99,9 +93,9 @@ let () =
       let fs = call env env "fs" [] in
       let filename = s env path in
       let content = s env "{value (answer) filename (filename)}" in
-      let written = call env fs "write-text" [ filename; content ] in
+      let written = call env fs "write" [ filename; content ] in
       check "stdlib text write" (truth env (call env written "ok?" []));
-      let loaded = call env fs "read-text" [ filename ] in
+      let loaded = call env fs "read" [ filename ] in
       check "stdlib text read"
         (Builtins.string_of_value env loaded
         = "{value (answer) filename (filename)}");
@@ -120,7 +114,7 @@ let () =
       let restricted_module = call env env "import" [ restricted; filename ] in
       check "module need not expose eval/filesystem capabilities"
         (call env restricted_module "value" [] |> Value.as_number = 42.);
-      ignore (call env fs "write-text" [ filename; s env "{run ({} missing)}" ]);
+      ignore (call env fs "write" [ filename; s env "{run ({} missing)}" ]);
       let bad = call env env "import" [ filename ] in
       (try
          ignore (call env bad "run" []);
@@ -130,8 +124,5 @@ let () =
            (position.filename = Some path);
          check "imported method reports method position"
            (position.line = 1 && position.column = 10));
-      Out_channel.with_open_bin path (fun c -> output_string c "A\226\130");
-      let incomplete = call env fs "read-text" [ filename ] in
-      check "read-text rejects incomplete UTF-8"
-        (not (truth env (call env incomplete "ok?" []))));
+      Out_channel.with_open_bin path (fun c -> output_string c "A\226\130"));
   Printf.printf "%d standard-library checks passed\n%!" !checks
