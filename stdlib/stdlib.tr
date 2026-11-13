@@ -1,225 +1,520 @@
-# Standard-library factory. Loading this file creates no global bindings.
-# Call its extend method to build a capability-scoped English environment.
-Library {
-  failure Message {ok? (false) message (Message)}
-
-  index I Size (
-    I = (I floor) then-else [
-      I >= 0 then-else [
-        I < Size then-else [I] [(crash "index out of bounds")] run
-      ] [(crash "negative index")] run
-    ] [(crash "non-integer index")] run
-  )
-
-  range Start Stop (
-    Start <= Stop then-else [
-      core extend list {
-        size (Stop - Start)
-        at I (Start + (Library index I (Stop - Start)))
-      }
-    ] [(crash "invalid range")] run
-  )
-
-  sequence L I {
-    run (I < (L size) then-else [
-      {cons? (true) get (L at I) next (Library sequence L (I + 1))}
-    ] [{cons? (false)}] run)
-  }
-
-  fold L F I Acc (
-    I = (L size) then-else [Acc] [
-      Library fold L F (I + 1) (F run Acc (L at I))
-    ] run
-  )
-
-  each L F I (
-    I = (L size) then-else [{}] [
-      (F run (L at I))
-      Library each L F (I + 1)
-    ] run
-  )
-
-  filter-sequence L P I {run (Library filter-node L P I)}
-  filter-node L P I (
-    I = (L size) then-else [{cons? (false)}] [
-      Element (L at I)
-      P run Element then-else [
-        {
-          cons? (true)
-          get (Element)
-          next (Library filter-sequence L P (I + 1))
-        }
-      ] [Library filter-node L P (I + 1)] run
-    ] run
-  )
-
-  equal A B I (
-    I = (A size) then-else [(true)] [
-      (A at I) = (B at I) then-else
-        [Library equal A B (I + 1)] [(false)] run
-    ] run
-  )
-
-  concat A B {
-    size ((A size) + (B size))
-    at I (
-      N (Library index I ((A size) + (B size)))
-      N < (A size) then-else [A at N] [B at (N - (A size))] run
-    )
-  }
-
-  conditional Choose {
-    else No (Choose run No run)
-    else-if Test Yes (
-      Library conditional {
-        run No (Choose run [Test run then-else Yes No run])
-      }
-    )
-    end (Choose run [] run)
-  }
-
-  boolean X {
-    X
-    not (X then-else (false) (true))
-    and Y (X then-else Y (false))
-    or Y (X then-else (true) Y)
-    xor Y (X then-else (Y then-else (false) (true)) Y)
-    and-then B (X then-else B [(false)] run)
-    or-else B (X then-else [(true)] B run)
-    then Yes (Library conditional {run No (X then-else Yes No)})
-    to-string (X then-else "true" "false")
-  }
-
-  number X {
-    X
-    abs (X < 0 then-else [X -] [X] run)
-    min Y (X < Y then-else X Y)
-    max Y (X > Y then-else X Y)
-  }
-
-  list X (
-    Self {
-      X
-      is-empty (X size = 0)
-      + Y (core extend list (Library concat X Y))
-      map F (core extend list {
-        size (X size)
-        at I (F run (X at (Library index I (X size))))
-      })
-      filter P (core extend list
-        (core from-seq (Library filter-sequence X P 0)))
-      fold F Seed (Library fold X F 0 Seed)
-      for-each F (Library each X F 0)
-      to-seq (Library sequence X 0)
-      strict (core extend list (core from-seq (Self to-seq)))
-    }
-    Self
-  )
-
-  string X (
-    Self {
-      (Library list X)
-      X
-      + Y (core extend string (Library concat X Y))
-      substring Start Stop (
-        Start = (Start floor) then-else [
-          Stop = (Stop floor) then-else [
-            Start >= 0 then-else [
-              Stop >= Start then-else [
-                Stop <= (X size) then-else [
-                  core extend string {
-                    size (Stop - Start)
-                    at I (X at (Start + (Library index I (Stop - Start))))
-                  }
-                ] [(crash "substring ends beyond string")] run
-              ] [(crash "substring ends before start")] run
-            ] [(crash "negative substring start")] run
-          ] [(crash "non-integer substring end")] run
-        ] [(crash "non-integer substring start")] run
-      )
-      reverse (core extend string {
-        size (X size)
-        at I (X at ((X size) - 1 - (Library index I (X size))))
-      })
-      equals Y ((X size) = (Y size) then-else
-        [Library equal X Y 0] [(false)] run)
-      to-string (Self)
-      strict (utf-8 from-bytes (utf-8 to-bytes X))
-    }
-    Self
-  )
-
-  text-result Text I Offset (
-    I = (Text size) then-else [Text] [
-      Code (Text at I)
-      Code >= 0 then-else [
-        Width (Code < 128 then-else 1 (Code < 2048 then-else 2
-          (Code < 65536 then-else 3 4)))
-        Library text-result Text (I + 1) (Offset + Width)
-      ] [
-        {(Library failure "invalid UTF-8 file") index (Offset) byte (Code -)}
-      ] run
-    ] run
-  )
-
-  read-text F (
-    Text (fs read F)
-    Text ok? then-else [Library text-result Text 0 0] [Text] run
-  )
-
-  import E F (
-    Host ()
-    Source (Library read-text F)
-    Source ok? then-else [
-      Module-Env {E filename (F)}
-      Module (env run Module-Env [(Host eval Source)])
-      () env bind Module-Env Module
-    ] [(crash (Source message))] run
-  )
-
-  extend E (
-    Native-Core (E core)
-    Native-Extend (Native-Core extend)
-    Native-FS (E fs)
-    Extend {
-      Native-Extend
-      boolean X (Library boolean (Native-Extend boolean X))
-      number X (Library number (Native-Extend number X))
-      string X (Library string (Native-Extend string X))
-      list X (Library list (Native-Extend list X))
-    }
-    Core {Native-Core extend (Extend)}
-    Environment {
-      E
-      core (Core)
-      fs {
-        Native-FS
-        read-text F (Library read-text F)
-        write-text F S (Native-FS write F S)
-      }
-      list {
-        range Start Stop (Library range Start Stop)
-        from L (core extend list (core from-seq (Library sequence L 0)))
-        from-minimal L (core extend list L)
-        of (
-          A (array)
-          Builder {
-            and X ((A push X) Builder)
-            end (core extend list (core from-seq (Library sequence A 0)))
-          }
-          Builder
-        )
-      }
-      string {
-        from-minimal S (core extend string S)
-        from S (utf-8 from-bytes (utf-8 to-bytes S))
-      }
-      import F (Library import () F)
-      import Module-Env F (Library import Module-Env F)
-    }
-    Environment
-  )
-
-  run B (env run (Library extend ()) B)
+Env {io {} fs {} system {} core {} list {} seq {} ()}
+IO {error {} (Env io)}
+IO/Error (IO error)
+FS (Env fs)
+System (Env system)
+Core {extend {} (Env core)}
+Core/Extend {
+    boolean Minimal-Boolean (Minimal-Boolean)
+    number Minimal-Number (Minimal-Number)
+    string Minimal-String (Minimal-String)
+    list Minimal-List (Minimal-List)
+    array Minimal-Array (Minimal-Array)
+    seq Minimal-Seq (Minimal-Seq)
+    error Minimal-Error (Minimal-Error)
+    (Core extend)
 }
-Library
+List (Env list)
+Seq (Env seq)
+
+Nil [{cons? (false)}]
+Parse-Error {ok? (false) message "parse error"}
+Char-DQ 34
+Char'-' 45
+Char'.' 46
+Char'0' 48
+Util {
+    wrap-void Replacement Result (core extend error (
+        Result ok? then-else {Result Replacement} Result
+    ))
+    cons Value Next [{cons? (true) get (Value) next (Next)}]
+    reverse List ({at I (List at (List size - I - 1)) size (List size)})
+    make-list Accumulated {
+        , Value (Util make-list (Util cons Value Accumulated))
+        > (core extend list (Util reverse (core from-seq Accumulated)))
+    }
+    to-seq I List (core extend seq (I < (List size) then-else [{
+        cons? (true)
+        get (List at I)
+        next (Util to-seq (I + 1) List)
+    }] Nil))
+    conditional Choose {
+        else Else-Block (Choose run Else-Block run)
+        else-if Condition-Block Else-If-Block (Util conditional {
+            run Else-Block (Choose run [
+                Condition-Block run then-else Else-If-Block Else-Block run
+            ])
+        })
+        end (Choose run [{}] run)
+    }
+    find-index Seq Predicate I (
+        Node (Seq run)
+        Node cons? then [
+            Predicate run (Node get) then [I] else [
+                Util find-index (Node next) Predicate (I + 1)
+            ]
+        ] else [I]
+    )
+    intersperse Seq Value (core extend seq [
+        Node (Seq run)
+        Node cons? then-else {
+            cons? (true)
+            get (Value)
+            next (core extend seq [{
+                cons? (true)
+                get (Node get)
+                next (Util intersperse (Node next) Value)
+            }])
+        } Node
+    ])
+    left-scan Seq Default Function (core extend seq [
+        Node (Seq run)
+        Node cons? then [Value (Function run Default (Node get)) {
+            cons? (true)
+            get (Value)
+            next (Util left-scan (Node next) Value Function)
+        }] else [Node]
+    ])
+    merge A B (core extend seq [
+        Node-A (A run)
+        Node-A cons? then [
+            Node-B (B run)
+            Node-B cons? then [
+                Node-A get <= (Node-B get) then-else {
+                    cons? (true)
+                    get (Node-A get)
+                    next (Util merge (Node-A next) [Node-B])
+                } {
+                    cons? (true)
+                    get (Node-B get)
+                    next (Util merge [Node-A] (Node-B next))
+                }
+            ] else [Node-A]
+        ] else B
+    ])
+    sort List (Size (List size) Size > 1 then [
+        Mid (Size // 2)
+        Left (Util sort (List sub 0 Mid))
+        Right (Util sort (List sub Mid Size))
+        Util merge Left Right
+    ] else [List to-seq])
+    bisect List Predicate Left Right (Left < Right then [
+        Mid (Left + Right // 2)
+        Predicate run (List at Mid) then [
+            Util bisect List Predicate Left Mid
+        ] else [
+            Util bisect List Predicate (Mid + 1) Right
+        ]
+    ] else [Left])
+    extend-list-like Self Extend-Function {
+        map Function (Extend-Function run {
+            at I (Function run (Self at I))
+            size (Self size)
+        })
+        zip Other (Extend-Function run {
+            at I (pair (Self at I) (Other at I))
+            size (Self size min (Other size))
+        })
+        + Other (Extend-Function run {
+            at I (
+                Size (Self size)
+                I < Size then [Self at I] else [Other at (I - Size)]
+            )
+            size (Self size + (Other size))
+        })
+        sub Start End (Extend-Function run {
+            at I (Self at (Start + I))
+            size (End - Start)
+        })
+        find-sub-index Sublist (crash "TODO: NOT IMPLEMENTED")
+        reverse (Extend-Function run (Util reverse Self))
+        sort (Util sort Self to-list)
+        bisect Predicate (Util bisect Self Predicate 0 (Self size))
+        = Other (Self size = (Other size) and-then [
+            Self to-seq zip (Other to-seq)
+            map {run X (X a = (X b))}
+            left-fold (true) {run A B (A and B)}
+        ])
+        <> Other (Self = Other not)
+        < Other (
+            Node (
+                Self to-seq zip (Other to-seq)
+                drop-while {run X (X a = (X b))} run
+            )
+            Node cons? then [
+                Pair (Node get)
+                Pair a < (Pair b)
+            ] else [Self size < (Other size)]
+        )
+        > Other (
+            Node (
+                Self to-seq zip (Other to-seq)
+                drop-while {run X (X a = (X b))} run
+            )
+            Node cons? then [
+                Pair (Node get)
+                Pair a > (Pair b)
+            ] else [Self size > (Other size)]
+        )
+        <= Other (Self > Other not)
+        >= Other (Self < Other not)
+        copy (Extend-Function run (core from-seq (Self to-seq)))
+        to-seq (Util to-seq 0 Self)
+    }
+}
+
+IO/Error' {
+    print String (Util wrap-void IO/Error' (IO/Error print String))
+    raw-print String (Util wrap-void IO/Error' (IO/Error raw-print String))
+    write Bytes (Util wrap-void IO/Error' (IO/Error write Bytes))
+    flush (Util wrap-void IO/Error' (IO/Error flush))
+}
+IO' {
+    IO
+    print String (Util wrap-void IO' (IO print String))
+    raw-print String (Util wrap-void IO' (IO raw-print String))
+    write Bytes (Util wrap-void IO' (IO write Bytes))
+    read-line (core extend error (IO read-line))
+    read N-Bytes (core extend error (IO read N-Bytes))
+    flush (Util wrap-void IO' (IO flush))
+    error (IO/Error')
+}
+FS' {
+    FS
+    read Filename (core extend error (FS read Filename))
+    write Filename (Util wrap-void FS' (FS write Filename))
+    open-read Filename (core extend error (
+        Handle (FS open-read Filename)
+        Handle ok? then-else {
+            Handle
+            read N-Bytes (core extend error (Handle read N-Bytes))
+            close (core extend error (Handle close))
+        } Handle
+    ))
+    open-write Filename (core extend error (
+        Handle (FS open-write Filename)
+        Handle ok? then-else (Self {
+            Handle
+            write Bytes (Util wrap-void Self (Handle write Bytes))
+            flush (Util wrap-void Self (Handle flush))
+            close (core extend error (Handle close))
+        }) Handle
+    ))
+    metadata Filename (core extend error (FS metadata Filename))
+    real-path Filename (core extend error (FS real-path Filename))
+    rename Filename Filename' (
+        Util wrap-void FS' (FS rename Filename Filename')
+    )
+    make-dir Dirname (Util wrap-void FS' (FS make-dir Dirname))
+    remove Filename (Util wrap-void FS' (FS remove Filename))
+    remove-dir Dirname (Util wrap-void FS' (FS remove-dir Dirname))
+    list-dir Dirname (core extend error (FS list-dir Dirname))
+    working-dir (core extend error (FS working-dir))
+    working-dir Dirname (Util wrap-void FS' (FS working-dir Dirname))
+}
+System' {
+    System
+    run Command (core extend error (System run Command))
+    run Command Input (core extend error (System run Command Input))
+}
+Core/Extend' {
+    Core/Extend
+    boolean Minimal-Boolean (Self {
+        (Core/Extend boolean Minimal-Boolean)
+        and Other (Self then-else Other Self)
+        and-then Block (Self then Block else [Self])
+        or Other (Self then-else Self Other)
+        or-else Block (Self then [Self] else Block)
+        xor Other (Self then [Other then-else [false] [Self] run] else [Other])
+        -> Other (Self then [Other] else [true])
+        not (Self then [false] else [true])
+        then Then-Block (Util conditional {
+            run Else-Block (Self then-else Then-Block Else-Block)
+        })
+        = Other (Self xor Other not)
+        <> Other (Self xor Other)
+        > Other (Self -> Other not)
+        < Other (Other -> Self not)
+        >= Other (Other -> Self)
+        <= Other (Self -> Other)
+        to-string (Self then-else "true" "false")
+    })
+    number Minimal-Number (Self {
+        (Core/Extend number Minimal-Number)
+        // Other (Self / Other floor)
+        min Other (Self < Other then-else Self Other)
+        max Other (Self > Other then-else Self Other)
+        abs (Self < 0 then [Self -] else [Self])
+        inv (1 / Self)
+        sqrt (Self ^ 0.5)
+    })
+    string Minimal-String (Self {
+        (Core/Extend string Minimal-String)
+        (Util extend-list-like Self {run X (core extend string X)})
+        to-number (core extend error (
+            Size (Self size)
+            Size = 0 or-else [
+                Self to-seq filter {run X (
+                    X <> Char'-'
+                    and (X <> Char'.')
+                    and (X < Char'0' or (X > (Char'0' + 9)))
+                )} run cons?
+            ]
+            or-else [X (Self at 0) X < Char'0' or (X > (Char'0' + 9))]
+            or-else [
+                Self to-seq take (Size - 1)
+                filter {run X (X = Char'-')} run cons?
+            ]
+            or-else [
+                Self to-seq filter {run X (X = Char'.')}
+                left-fold 0 {run A B (A + 1)} > 1
+            ]
+            then [Parse-Error] else [{(
+                Neg (Self at (Size - 1) = Char'-')
+                Size (Neg then-else (Size - 1) Size)
+                Self (Self sub 0 Size)
+                Dot (Self to-seq find-index {run X (X = Char'.')})
+                Before (Self sub 0 Dot reverse to-seq)
+                After (Self sub (Dot + 1 min Size) Size to-seq)
+                () seq iterate 1 {run X (X * 10)} zip Before
+                + (seq iterate 0.1 {run X (X / 10)} zip After)
+                map {run X (X a * (X b - Char'0'))}
+                left-fold 0 {run A B (A + B)}
+                * (Neg then-else 1- 1)
+            ) ok? (true)}]
+        ))
+        to-bytes (utf-8 to-bytes Self)
+        to-string (
+            seq single ("""" to-seq)
+            + (Self to-seq map {run X (
+                X = Char-DQ then [S (seq single X) S + S] else [seq single X]
+            )})
+            + (seq single ("""" to-seq))
+            flatten to-string
+        )
+    })
+    list Minimal-List (Self {
+        (Core/Extend list Minimal-List)
+        (Util extend-list-like Self {run X (core extend list X)})
+        to-string (Self size > 0 then [
+            seq single ("list < " to-seq)
+            + (
+                Self to-seq map {run X (X to-string to-seq)}
+                intersperse (" , " to-seq)
+            )
+            + (seq single (" >" to-seq))
+            flatten to-string
+        ] else ["list <>"])
+    })
+    array Minimal-Array (Self {
+        (core extend list (Core/Extend array Minimal-Array))
+        clear ((while [Self size > 0] [Self pop]) Self)
+        insert Index Value (
+            (Self push {})
+            (list range Index (Self size - 1) reverse to-seq for-each {run I (
+                Self set (I + 1) (Self at I)
+            )})
+            (Self set Index Value)
+            Self
+        )
+        remove Index (
+            Value (Self at Index)
+            (list range Index (Self size - 1) to-seq for-each {run I (
+                Self set I (Self at (I + 1))
+            )})
+            (Self pop)
+            Value
+        )
+        append Other ((Other to-seq for-each {run X (Self push X)}) Self)
+        reverse-in-place (
+            Size (Self size)
+            (list range 0 (Size // 2) to-seq for-each {run I (
+                T (Self at I)
+                J (Size - I - 1)
+                (Self set I (Self at J))
+                Self set J T
+            )})
+            Self
+        )
+        sort-in-place (crash "TODO: NOT IMPLEMENTED")
+        copy (Self to-seq to-array)
+    })
+    seq Minimal-Seq (Self {
+        (Core/Extend seq Minimal-Seq)
+        map Function (core extend seq [
+            Node (Self run)
+            Node cons? then-else {
+                cons? (true)
+                get (Function run (Node get))
+                next (Node next map Function)
+            } Node
+        ])
+        filter Predicate (core extend seq [
+            Node (Self run)
+            Node cons? then [
+                Value (Node get)
+                Predicate run Value then [{
+                    cons? (true)
+                    get (Value)
+                    next (Node next filter Predicate)
+                }] else [Node next filter Predicate run]
+            ] else [Node]
+        ])
+        zip Other (core extend seq [
+            Node (Self run)
+            Node cons? then [
+                Node' (Other run)
+                Node' cons? then-else {
+                    cons? (true)
+                    get (pair (Node get) (Node' get))
+                    next (Node next zip (Node' next))
+                } Node'
+            ] else [Node]
+        ])
+        + Other (core extend seq [
+            Node (Self run)
+            Node cons? then [{
+                cons? (true)
+                get (Node get)
+                next (Node next + Other)
+            }] else [Other run]
+        ])
+        take Number (core extend seq [
+            Number >= 1 then [Node (Self run) {
+                cons? (true)
+                get (Node get)
+                next (Node next take (Number - 1))
+            }] else Nil
+        ])
+        drop Number (core extend seq [
+            Node (Self run)
+            Number >= 1 then [Node next drop (Number - 1) run] else Self
+        ])
+        take-while Predicate (core extend seq [
+            Node (Self run)
+            Node cons? then [
+                Predicate run (Node get) then [{
+                    cons? (true)
+                    get (Node get)
+                    next (Node next take-while Predicate)
+                }] else Nil
+            ] else [Node]
+        ])
+        drop-while Predicate (core extend seq [
+            Node (Self run)
+            Node cons? then [
+                Predicate run (Node get) then [
+                    Node next drop-while Predicate run
+                ] else Self
+            ] else [Node]
+        ])
+        find-index Predicate (Util find-index Self Predicate 0)
+        intersperse Value (core extend seq [
+            Node (Self run)
+            Node cons? then-else {
+                cons? (true)
+                get (Node get)
+                next (Util intersperse (Node next) Value)
+            } Node
+        ])
+        left-fold Default Function (
+            Node (Self run)
+            Node cons? then [
+                Node next left-fold (Function run Default (Node get)) Function
+            ] else [Default]
+        )
+        right-fold Default Function (
+            Node (Self run)
+            Node cons? then [
+                Function run (Node get) [Node next right-fold Default Function]
+            ] else [Default]
+        )
+        left-scan Default Function (core extend seq [{
+            cons? (true)
+            get (Default)
+            next (Util left-scan Self Default Function)
+        }])
+        flatten (core extend seq [
+            Node (Self run)
+            Node cons? then [Node get + (Node next flatten) run] else [Node]
+        ])
+        for-each Function (
+            Node (Self run)
+            Node cons? then [
+                (Function run (Node get))
+                Node next for-each Function
+            ] end
+        )
+        to-string (core extend string (core from-seq Self))
+        to-list (core extend list (core from-seq Self))
+        to-array (Array (array) Self for-each {run X (Array push X)} Array)
+    })
+    error Minimal-Error (Self {
+        (Core/Extend error Minimal-Error)
+        crash (Self ok? then [Self] else [crash (Self message)])
+    })
+}
+Core' {
+    Core
+    extend (Core/Extend')
+}
+List' {
+    List
+    <> (core extend list {size 0})
+    # usage example: list < 1 , 2 , 3 >
+    < Value (Util make-list Nil , Value)
+    range Start End (core extend list {at I (Start + I) size (End - Start)})
+    repeat Value Size (core extend list {at I (Value) size (Size)})
+}
+Seq' {
+    Seq
+    range Start (core extend seq [
+        {cons? (true) get (Start) next (seq range (Start + 1))}
+    ])
+    repeat Value (Self {(core extend seq (Util cons Value Self))})
+    iterate First Function (core extend seq [{
+        cons? (true)
+        get (First)
+        next (seq iterate (Function run First) Function)
+    }])
+    single Value (core extend seq [{
+        cons? (true)
+        get (Value)
+        next (core extend seq Nil)
+    }])
+}
+Env' {
+    Env
+    io (IO')
+    fs (FS')
+    system (System')
+    array (core extend array (Env array))
+    true (core extend boolean {then-else A B (A)})
+    false (core extend boolean {then-else A B (B)})
+    core (Core')
+    import Filename (import () Filename)
+    import Module-Env Filename (env bind {Module-Env filename (Filename)} (
+        raw-import Module-Env Filename
+    ))
+    import-env Filename (import-env () Filename)
+    import-env Module-Env Filename (
+        Module (raw-import Module-Env Filename)
+        () env bind {Module-Env filename (Filename) Module} Module
+    )
+    raw-import Filename (raw-import () Filename)
+    raw-import Module-Env Filename (
+        Env ()
+        () env run {Module-Env filename (Filename)} [
+            Env eval (Env fs read Filename crash)
+        ]
+    )
+    list (List')
+    pair A B {a (A) b (B)}
+    seq (Seq')
+    while Condition-Block Loop-Block (
+        Condition-Block run then [
+            (Loop-Block run)
+            () while Condition-Block Loop-Block
+        ] end
+    )
+}
