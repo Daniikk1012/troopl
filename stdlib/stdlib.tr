@@ -374,7 +374,11 @@ Core/Extend' {
             )})
             Self
         )
-        sort-in-place (crash "TODO: NOT IMPLEMENTED")
+        sort-in-place (
+            Self sort zip (list range 0 (Self size)) to-seq for-each { run X (
+                Self set (X b) (X a)
+            )}
+        )
         copy (Self to-seq to-array)
     })
     seq Minimal-Seq (Self {
