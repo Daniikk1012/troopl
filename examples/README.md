@@ -1,10 +1,18 @@
 # Runnable Troopl examples
 
-For a larger application, see the [interactive calculator](calculator/README.md).
-It has its own parser, variables, functions, recoverable errors, history,
-session save/load, filesystem inspection, and explicit process execution.
+For a larger application, see one of these examples:
+- [Interactive calculator](calculator/README.md).
+  It has its own parser, variables, functions, recoverable errors, history,
+  session save/load, filesystem inspection, and explicit process execution;
+- [Expense tracker](expenses/README.md).
+  If showcases how to work with modules and restrict their environment's
+  capabilities.
 
-Run from the repository root:
+For the examples showcasing alternative programming paradigms, see:
+- [Combinator library for tacit programming](tacit/README.md);
+- [Stack-based concatenative sub-language](stack/README.md).
+
+For the small examples, run from the repository root:
 
 ```sh
 dune exec troopl -- examples/example_01.tr
