@@ -106,6 +106,44 @@ Util {
             Util bisect List Predicate (Mid + 1) Right
         ]
     ] else [Left])
+
+    kmp-table Pattern (
+        Table (array)
+        (Table push 0)
+        Util kmp-build Pattern 1 0 Table
+    )
+    kmp-build Pattern I K Table (I = (Pattern size) then-else [Table] [
+        (Pattern at I) = (Pattern at K) then-else [
+            (Table push (K + 1))
+            Util kmp-build Pattern (I + 1) (K + 1) Table
+        ] [
+            K > 0 then-else [
+                Util kmp-build Pattern I (Table at (K - 1)) Table
+            ] [
+                (Table push 0)
+                Util kmp-build Pattern (I + 1) 0 Table
+            ] run
+        ] run
+    ] run)
+    kmp-scan Text Pattern Table I K (Text size = I then-else [I] [
+        (Text at I) = (Pattern at K) then-else [
+            (K + 1) = (Pattern size) then-else [
+                I - (Pattern size) + 1
+            ] [
+                Util kmp-scan Text Pattern Table (I + 1) (K + 1)
+            ] run
+        ] [
+            K > 0 then-else [
+                Util kmp-scan Text Pattern Table I (Table at (K - 1))
+            ] [
+                Util kmp-scan Text Pattern Table (I + 1) 0
+            ] run
+        ] run
+    ] run)
+    find-sub-index Text Pattern (Pattern size = 0 then-else [0] [
+        Util kmp-scan Text Pattern (Util kmp-table Pattern) 0 0
+    ] run)
+
     extend-list-like Self Extend-Function {
         map Function (Extend-Function run {
             at I (Function run (Self at I))
@@ -126,7 +164,7 @@ Util {
             at I (Self at (Start + I))
             size (End - Start)
         })
-        find-sub-index Sublist (crash "TODO: NOT IMPLEMENTED")
+        find-sub-index Sublist (Util find-sub-index Self Sublist)
         reverse (Extend-Function run (Util reverse Self))
         sort (Util sort Self to-list)
         bisect Predicate (Util bisect Self Predicate 0 (Self size))
