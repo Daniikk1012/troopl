@@ -1,0 +1,76 @@
+# =============================================================================
+#  TrOOPL Expense Tracker - trusted launcher (main.tr)
+#
+#  Run from the repository root:
+#      dune exec troopl -- examples/expenses/main.tr
+#
+#  This file is the only code that receives the full default environment
+#  (console, whole file system, eval, exit, ...). Its job is to:
+#    1. load the standard library written in TrOOPL;
+#    2. build a RESTRICTED environment for the application, in which the file
+#       system is replaced by a tiny capability that can touch exactly one
+#       data file and nothing else;
+#    3. import the application module (app.tr) into that restricted
+#       environment and start it.
+#  The application itself therefore cannot read or delete other files, run
+#  eval, or terminate the interpreter, even if it contained a bug or was
+#  written by somebody we do not trust.
+# =============================================================================
+
+# ---- Step 1: load the standard library (same pattern as stdlib/init.tr) ----
+
+# Read the library file; `fs read` returns a result with ok?.
+Source (fs read "stdlib/stdlib.tr")
+# Stop with a clear message if the file could not be read.
+(Source ok? then-else [{}] [(crash (Source message))] run)
+# An environment identical to the current one but reporting errors with the
+# library's file name.
+Loader {() filename "stdlib/stdlib.tr"}
+# Evaluate the library source; it returns a factory object.
+Stdlib (env run Loader [(eval Source)])
+# `extend` builds a new environment: the current one plus English methods
+# (then/else, +, equals, map, fold, import, ...).
+
+# ---- Step 2 and 3: everything below runs in the extended environment ----
+(env run Stdlib [
+  # `()` is the current dynamic environment, i.e. the extended one.
+  Host ()
+
+  # The only file the application is allowed to use.
+  Data-File "expenses.db"
+
+  # Keep a private reference to the full file-system capability.
+  Full-FS (fs)
+
+  # Attenuated file system for the application: two methods, no file names.
+  # `env bind Host` makes these methods always run in the trusted Host
+  # environment, so they can use Full-FS internally, while the application
+  # only ever sees `load` and `save`.
+  Safe-FS (env bind Host {
+    load (Full-FS read Data-File)                 # -> text with ok?
+    save Text (Full-FS write Data-File Text)      # -> {} with ok?
+  })
+
+  # The restricted environment given to the application. Each method simply
+  # forwards to the host, except `fs`, which is replaced by Safe-FS.
+  # Deliberately NOT included: eval, exit, utf-8, env, and the real fs.
+  App-Env {
+    core (Host core)             # needed to build numbers, strings, booleans
+    io (Host io)                 # console input and output
+    list (Host list)             # list helpers from the standard library
+    true (Host true)             # boolean constants
+    false (Host false)
+    box X (Host box X)           # mutable single-value cell
+    array (Host array)           # mutable growable array
+    crash Message (Host crash Message)
+    fs (Safe-FS)                 # one-file storage instead of the file system
+    pair A B (Host pair A B)     # standard library pair constructor
+  }
+
+  # Read app.tr and evaluate it inside App-Env. The module returns its
+  # `App` object, whose methods are bound to App-Env.
+  App (import App-Env "examples/expenses/app.tr")
+
+  # Hand control to the application.
+  App start
+])

@@ -1,0 +1,500 @@
+# =============================================================================
+#  TrOOPL Expense Tracker - application module (app.tr)
+#
+#  A small interactive console program for keeping a personal journal of
+#  expenses. The user types commands, one per line:
+#
+#      add AMOUNT CATEGORY [NOTE...]   record an expense, e.g. add 12.50 food lunch
+#      list                            show all recorded expenses
+#      total                           show the total amount spent
+#      report                          totals per category, largest first
+#      remove NUMBER                   delete an expense (number from `list`)
+#      save                            write the journal to disk
+#      help                            show the list of commands
+#      quit                            save (if needed) and exit
+#
+#  This module is loaded by main.tr inside a restricted environment. The only
+#  capabilities it can use are: io, core, list, true/false, box, array, crash
+#  and `fs`, which here is NOT the real file system but an object with just
+#  two methods: `fs load` and `fs save Text` for one fixed data file.
+#
+#  Money is stored as a whole number of cents (12.50 -> 1250) so that sums are
+#  exact and no floating-point rounding errors appear.
+#
+#  Data file format: one expense per line, fields separated by ';'
+#      12.50;food;lunch with the team
+# =============================================================================
+
+# ---- Character codes (strings are sequences of Unicode code points) ----
+Code-LF 10                  # line feed, '\n'
+Code-CR 13                  # carriage return, '\r' (Windows line endings)
+Code-Space 32               # ' '
+Code-Dot 46                 # '.'
+Code-Semicolon 59           # ';'
+Code-0 48                   # '0'
+Code-9 57                   # '9'
+
+# A string containing a single line break. A real line break inside the
+# literal is used, because TrOOPL has no escape sequences other than "".
+Newline "
+"
+
+# ---- Mutable program state (only possible through box/array capabilities) ----
+Items (box (array))         # the journal: a box holding an array of expenses
+Dirty (box (false))         # true when there are changes not yet saved
+
+# =============================================================================
+#  Result: uniform success / failure values (the `ok?` protocol used by the
+#  whole language), so that errors are values and never crash the program.
+# =============================================================================
+Result {
+  success Value {ok? (true) value (Value)}
+  failure Message {ok? (false) message (Message)}
+}
+
+# =============================================================================
+#  Expense: constructor for a single journal entry.
+#  An expense is just an object with three read-only methods.
+# =============================================================================
+Expense {
+  make Cents Category Note {amount (Cents) category (Category) note (Note)}
+}
+
+# =============================================================================
+#  Text: string utilities built only from `at`, `size`, `sub` and `+`.
+#  There is no built-in split or trim, so we write them ourselves.
+# =============================================================================
+Text {
+  # Split S at every character with code Sep. Returns a list of strings.
+  # Example: split "a;b;c" 59 -> ["a", "b", "c"]
+  split S Sep (
+    Parts (array)                           # pieces collected so far
+    Text split-loop S Sep 0 0 Parts
+  )
+  # Start = index where the current piece begins, I = index being examined.
+  split-loop S Sep Start I Parts (
+    I = (S size) then [
+      (Parts push (S sub Start I))          # last piece (may be empty)
+    ] else [
+      (S at I) = Sep then [
+        (Parts push (S sub Start I))  # close the current piece
+        Text split-loop S Sep (I + 1) (I + 1) Parts
+      ] else [
+        Text split-loop S Sep Start (I + 1) Parts   # keep scanning
+      ]
+    ]
+  )
+
+  # Split a command line into words, ignoring repeated spaces.
+  # "  add   5  food " -> ["add", "5", "food"]
+  words S ((Text split S Code-Space) to-seq filter {run W (W size > 0)} to-list)
+
+  # Join Words starting at index From, putting Sep between them.
+  # Used to glue the free-form note back together: ["lunch", "out"] -> "lunch out"
+  join Words From Sep (
+    From >= (Words size) then [""] else [
+      Text join-loop Words (From + 1) Sep (Words at From)
+    ]
+  )
+  join-loop Words I Sep Acc (
+    I >= (Words size) then [Acc] else [
+      Text join-loop Words (I + 1) Sep (Acc + Sep + (Words at I))
+    ]
+  )
+
+  # True if string S contains the character with code C (search from I).
+  has-char S C I (
+    I = (S size) then [(false)] else [
+      (S at I) = C then [(true)] else [Text has-char S C (I + 1)]
+    ]
+  )
+
+  # Remove a trailing '\r' so that files saved on Windows load correctly.
+  strip-cr S (
+    (S size) > 0 then [
+      (S at ((S size) - 1)) = Code-CR then [S sub 0 ((S size) - 1)] else [S]
+    ] else [S]
+  )
+
+  # Add spaces on the right / left until S is at least Width characters long.
+  pad-right S Width ((S size) >= Width then [S] else [Text pad-right (S + " ") Width])
+  pad-left S Width ((S size) >= Width then [S] else [Text pad-left (" " + S) Width])
+
+  # S repeated N times, e.g. repeat "-" 3 -> "---".
+  repeat S N (N <= 0 then [""] else [S + (Text repeat S (N - 1))])
+}
+
+# =============================================================================
+#  Integer: parse a non-negative whole number such as "3".
+# =============================================================================
+Integer {
+  parse S ((S size) = 0 then [Result failure "number is empty"] else [
+    Integer parse-loop S 0 0
+  ])
+  # Acc accumulates the value digit by digit: "42" -> 4 -> 42.
+  parse-loop S I Acc (
+    I = (S size) then [Result success Acc] else [
+      C (S at I)
+      (C >= Code-0) and (C <= Code-9) then [
+        Integer parse-loop S (I + 1) ((Acc * 10) + (C - Code-0))
+      ] else [Result failure ("not a whole number: " + S)]
+    ]
+  )
+}
+
+# =============================================================================
+#  Money: conversion between text like "12.5" and whole cents (1250).
+# =============================================================================
+Money {
+  # Parse an amount with at most two digits after the decimal point.
+  # Returns Result success Cents, or Result failure with an explanation.
+  parse S ((S size) = 0 then [Result failure "amount is empty"] else [
+    Money parse-loop S 0 0 (false) 0
+  ])
+
+  # I        - index of the character being examined
+  # Acc      - all digits read so far as one integer ("12.5" -> 125)
+  # Seen-Dot - whether the decimal point has already been read
+  # Frac     - how many digits were read after the decimal point
+  parse-loop S I Acc Seen-Dot Frac (
+    I = (S size) then [Money finish Acc Frac] else [
+      C (S at I)
+      C = Code-Dot then [
+        # A second '.' is an error; otherwise remember that we saw it.
+        Seen-Dot then [Result failure "amount has two decimal points"]
+                 else [Money parse-loop S (I + 1) Acc (true) Frac]
+      ] else-if [(C >= Code-0) and (C <= Code-9)] [
+        Seen-Dot and (Frac = 2) then [
+          Result failure "use at most two digits after the decimal point"
+        ] else [
+          # Count the digit as a fractional one only after the '.'.
+          Next-Frac (Seen-Dot then-else (Frac + 1) Frac)
+          Money parse-loop S (I + 1) ((Acc * 10) + (C - Code-0)) Seen-Dot Next-Frac
+        ]
+      ] else [Result failure ("invalid amount: " + S)]
+    ]
+  )
+
+  # Scale the digits to cents: 0 fractional digits -> *100, 1 -> *10, 2 -> *1.
+  finish Acc Frac (
+    Cents (Acc * (10 ^ (2 - Frac)))
+    Cents = 0 then [Result failure "amount must be greater than zero"]
+              else [Result success Cents]
+  )
+
+  # Format cents as text with exactly two decimals: 1250 -> "12.50", 7 -> "0.07".
+  format Cents (
+    Whole ((Cents / 100) floor)              # whole currency units
+    Part (Cents mod 100)                     # remaining cents, 0..99
+    Part-Text (Part < 10 then-else ("0" + (Part to-string)) (Part to-string))
+    (Whole to-string) + "." + Part-Text
+  )
+}
+
+# =============================================================================
+#  Store: the journal of expenses and its conversion to/from the data file.
+# =============================================================================
+Store {
+  all (Items get)                            # the array of expenses
+  count (Items get size)                     # number of expenses
+  add E ((Items get) push E)                 # append one expense
+
+  # Native arrays cannot delete from the middle, so build a new array without
+  # the element at Index and put it into the box instead of the old one.
+  remove Index (
+    Old (Items get)
+    New (array)
+    (Store copy-except Old New 0 Index)
+    (Items set New)
+    {}
+  )
+  copy-except Old New I Skip (
+    I = (Old size) then [New] else [
+      (I = Skip then [{}] else [(New push (Old at I))])
+      Store copy-except Old New (I + 1) Skip
+    ]
+  )
+
+  # Convert the whole journal to the text stored in the data file.
+  serialize (Store serialize-loop (Items get) 0 "")
+  serialize-loop All I Acc (
+    I = (All size) then [Acc] else [
+      E (All at I)
+      Line ((Money format (E amount)) + ";" + (E category) + ";" + (E note) + Newline)
+      Store serialize-loop All (I + 1) (Acc + Line)
+    ]
+  )
+
+  # Fill the journal from the text of the data file.
+  # Returns how many expenses were loaded; damaged lines are reported and skipped.
+  load-text T (Store load-lines (Text split T Code-LF) 0 0)
+  load-lines Lines I Loaded (
+    I = (Lines size) then [Loaded] else [
+      Line (Text strip-cr (Lines at I))
+      Line size = 0 then [
+        Store load-lines Lines (I + 1) Loaded            # skip empty lines
+      ] else [
+        Parts (Text split Line Code-Semicolon)           # amount;category;note
+        Amount (Money parse (Parts at 0))
+        ((Parts size) = 3) and-then [Amount ok?] then [
+          (Store add (Expense make (Amount value) (Parts at 1) (Parts at 2)))
+          Store load-lines Lines (I + 1) (Loaded + 1)
+        ] else [
+          (io print ("Warning: skipping damaged line " + ((I + 1) to-string) + ": " + Line))
+          Store load-lines Lines (I + 1) Loaded
+        ]
+      ]
+    ]
+  )
+}
+
+# =============================================================================
+#  App: user interface - the command loop and one method per command.
+#  Every command method returns a boolean: true = keep running, false = stop.
+#  This is the value returned by the module, i.e. what main.tr receives.
+# =============================================================================
+App {
+  # Entry point called by main.tr.
+  start (
+    (io print "=== TrOOPL Expense Tracker ===")
+    Loaded (fs load)                         # try to read the data file
+    (Loaded ok? then [
+      Count (Store load-text Loaded)
+      (io print ("Loaded " + (Count to-string) + " expense(s) from the journal."))
+    ] else [
+      (io print "No saved journal found - starting with an empty one.")
+    ])
+    (io print "Type 'help' to see the available commands.")
+    App loop
+  )
+
+  # Main loop: read a line, execute it, repeat. The recursive call is in tail
+  # position, so the interpreter reuses the stack frame and the loop can run
+  # forever without a stack overflow.
+  loop (
+    Line (io read-line)
+    Line ok? then [
+      Continue (App execute (Text words Line))
+      Continue then [App loop] else [App finish]
+    ] else [
+      App finish                             # end of input (e.g. Ctrl+D)
+    ]
+  )
+
+  # Choose the command by its first word. Booleans are objects, so this
+  # whole "switch" is a chain of method calls: then / else-if / else.
+  execute Words (
+    Words size = 0 then [(true)] else [      # empty line: do nothing
+      Command (Words at 0)
+      Command = "help" then [App help]
+      else-if [Command = "add"] [App add Words]
+      else-if [Command = "list"] [App show-list]
+      else-if [Command = "total"] [App total]
+      else-if [Command = "report"] [App report]
+      else-if [Command = "remove"] [App remove Words]
+      else-if [Command = "save"] [App save]
+      else-if [Command = "quit"] [(false)]
+      else [
+        (io print ("Unknown command '" + Command + "'. Type 'help'."))
+        (true)
+      ]
+    ]
+  )
+
+  # ---- help ----
+  help (
+    (io print "Commands:")
+    (io print "  add AMOUNT CATEGORY [NOTE...]  record an expense (e.g. add 12.50 food lunch)")
+    (io print "  list                           show all expenses")
+    (io print "  total                          show the total spent")
+    (io print "  report                         totals per category")
+    (io print "  remove NUMBER                  delete an expense (number from 'list')")
+    (io print "  save                           save the journal to disk")
+    (io print "  quit                           save changes and exit")
+    (true)
+  )
+
+  # ---- add AMOUNT CATEGORY [NOTE...] ----
+  add Words (
+    (Words size) < 3 then [
+      (io print "Usage: add AMOUNT CATEGORY [NOTE...]")
+      (true)
+    ] else [
+      Amount (Money parse (Words at 1))
+      Category (Words at 2)
+      Note (Text join Words 3 " ")           # everything after the category
+      # ';' separates fields in the data file, so it may not appear in text.
+      Bad-Text ((Text has-char Category Code-Semicolon 0) or (Text has-char Note Code-Semicolon 0))
+      Amount ok? not then [
+        (io print ("Error: " + (Amount message)))
+        (true)
+      ] else-if [Bad-Text] [
+        (io print "Error: the character ';' is not allowed in category or note")
+        (true)
+      ] else [
+        (Store add (Expense make (Amount value) Category Note))
+        (Dirty set (true))                   # remember there are unsaved changes
+        (io print ("Added " + (Money format (Amount value)) + " to '" + Category + "'."))
+        (true)
+      ]
+    ]
+  )
+
+  # ---- list ----
+  show-list (
+    ((Store count) = 0 then [
+      (io print "The journal is empty.")
+    ] else [
+      # Table header, then one row per expense.
+      (io print ((Text pad-left "#" 4) + "  " + (Text pad-left "Amount" 10) + "  "
+        + (Text pad-right "Category" 12) + "  Note"))
+      (io print (Text repeat "-" 50))
+      App list-loop (Store all) 0
+    ])
+    (true)
+  )
+  list-loop All I (
+    I = (All size) then [{}] else [
+      E (All at I)
+      (io print ((Text pad-left ((I + 1) to-string) 4) + "  "
+        + (Text pad-left (Money format (E amount)) 10) + "  "
+        + (Text pad-right (E category) 12) + "  " + (E note)))
+      App list-loop All (I + 1)
+    ]
+  )
+
+  # ---- total ----
+  total (
+    Sum (App sum (Store all))
+    (io print ("Total spent: " + (Money format Sum) + " in "
+      + ((Store count) to-string) + " expense(s)."))
+    (true)
+  )
+  # Sum of all amounts: turn the array into a list and fold over it.
+  sum All (All to-seq left-fold 0 {run Acc E (Acc + (E amount))})
+
+  # ---- report ----
+  report (
+    ((Store count) = 0 then [
+      (io print "The journal is empty.")
+    ] else [
+      Groups (App group (Store all) 0 (array))   # one group per category
+      (App sort Groups 0)                        # largest total first
+      Grand (App sum (Store all))
+      (io print ((Text pad-right "Category" 12) + (Text pad-left "Amount" 10)
+        + (Text pad-left "Share" 7) + "  Chart"))
+      (io print (Text repeat "-" 50))
+      (App report-loop Groups 0 Grand)
+      (io print (Text repeat "-" 50))
+      (io print ((Text pad-right "Total" 12) + (Text pad-left (Money format Grand) 10)))
+    ])
+    (true)
+  )
+
+  # Collect expenses into groups {name, total} - one group per category.
+  group All I Groups (
+    I = (All size) then [Groups] else [
+      E (All at I)
+      Found (App find-group Groups (E category) 0)
+      (Found ok? then [
+        G (Found value)
+        G total set ((G total get) + (E amount))   # add to existing group
+      ] else [
+        Name (E category)
+        Total (box (E amount))                     # new group with its own box
+        Groups push {name (Name) total (Total)}
+      ])
+      App group All (I + 1) Groups
+    ]
+  )
+  # Linear search for the group with the given category name.
+  find-group Groups Name I (
+    I = (Groups size) then [Result failure "not found"] else [
+      G (Groups at I)
+      (G name) = Name then [Result success G] else [
+        App find-group Groups Name (I + 1)
+      ]
+    ]
+  )
+
+  # Selection sort in place: put the largest remaining group at position I.
+  sort Groups I (
+    I >= (Groups size) then [Groups] else [
+      Best (App max-index Groups (I + 1) I)
+      (App swap Groups I Best)
+      App sort Groups (I + 1)
+    ]
+  )
+  max-index Groups J Best (
+    J = (Groups size) then [Best] else [
+      (Groups at J total get) > (Groups at Best total get)
+        then [App max-index Groups (J + 1) J]
+        else [App max-index Groups (J + 1) Best]
+    ]
+  )
+  swap A I J (
+    Tmp (A at I)
+    (A set I (A at J))
+    A set J Tmp
+  )
+
+  # Print one line per group: name, amount, share in percent, and a bar
+  # of up to 20 '#' characters proportional to the share.
+  report-loop Groups I Grand (
+    I = (Groups size) then [{}] else [
+      G (Groups at I)
+      Amount (G total get)
+      Percent (((Amount * 100) / Grand) + 0.5 floor)     # rounded percent
+      Bar (((Amount * 20) / Grand) + 0.5 floor)          # bar length 0..20
+      (io print ((Text pad-right (G name) 12)
+        + (Text pad-left (Money format Amount) 10)
+        + (Text pad-left (Percent to-string) 6) + "%  "
+        + (Text repeat "#" Bar)))
+      App report-loop Groups (I + 1) Grand
+    ]
+  )
+
+  # ---- remove NUMBER ----
+  remove Words (
+    (Words size) <> 2 then [
+      (io print "Usage: remove NUMBER (see 'list' for numbers)")
+      (true)
+    ] else [
+      N (Integer parse (Words at 1))
+      # Valid only if it is a number between 1 and the number of expenses.
+      N ok? and-then [((N value) >= 1) and ((N value) <= (Store count))] then [
+        Index ((N value) - 1)                    # list numbers start at 1
+        E ((Store all) at Index)
+        (Store remove Index)
+        (Dirty set (true))
+        (io print ("Removed #" + ((N value) to-string) + ": "
+          + (Money format (E amount)) + " " + (E category) + "."))
+        (true)
+      ] else [
+        (io print ("Error: there is no expense number " + (Words at 1) + "."))
+        (true)
+      ]
+    ]
+  )
+
+  # ---- save ----
+  # `fs save` is the only way this module can write anything to disk,
+  # and it can only write the single file chosen by main.tr.
+  save (
+    Saved (fs save (Store serialize))
+    Saved ok? then [
+      (Dirty set (false))
+      (io print ("Saved " + ((Store count) to-string) + " expense(s)."))
+      (true)
+    ] else [
+      (io print ("Error: could not save the journal: " + (Saved message)))
+      (true)
+    ]
+  )
+
+  # ---- quit / end of input ----
+  finish (
+    (Dirty get then [App save] else [(true)])   # auto-save unsaved changes
+    (io print "Goodbye!")
+  )
+}
