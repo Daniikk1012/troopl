@@ -344,8 +344,10 @@ Core/Extend' {
             flatten to-string
         ] else ["list <>"])
     })
-    array Minimal-Array (Self {
-        (core extend list (Core/Extend array Minimal-Array))
+    array Minimal-Array (Array (Core/Extend array Minimal-Array) Self {
+        (core extend list Array)
+        push Value ((Array push Value) Self)
+        set Index Value ((Array set Index Value) Self)
         clear ((while [Self size > 0] [Self pop]) Self)
         insert Index Value (
             (Self push {})
