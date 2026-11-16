@@ -125,7 +125,7 @@ Util {
             ] run
         ] run
     ] run)
-    kmp-scan Text Pattern Table I K (Text size = I then-else [I] [
+    kmp-scan Text Pattern Table I K (Text size = I then-else [(Text size) - (Pattern size) + 1] [
         (Text at I) = (Pattern at K) then-else [
             (K + 1) = (Pattern size) then-else [
                 I - (Pattern size) + 1
