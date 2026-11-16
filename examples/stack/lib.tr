@@ -1,0 +1,51 @@
+# Environment requirements:
+#   Import: Nothing
+#   Use:
+#     Methods of the result
+#     (env run Env Block)
+#     (env bind Env Obj)
+
+Util {
+    cons X N {get (X) next (N)}
+    binop F S D (Util ops-for-stack (
+        B (S get)
+        N (S next)
+        A (N get)
+        Util cons (F run A B) (N next)
+    ) D)
+    ops-for-stack S D (Self {
+        define E (Util ops-for-stack S {D E})
+        . X (Util ops-for-stack (Util cons X S) D)
+        dup (Util ops-for-stack (Util cons (S get) S) D)
+        drop (Util ops-for-stack (S next) D)
+        swap (Util ops-for-stack (
+            A (S get)
+            N (S next)
+            B (N get)
+            Util cons B (Util cons A (N next))
+        ) D)
+        run (Util ops-for-stack (
+            N (S next)
+            (env run {() : (Util ops-for-stack N D)} [S get run :])
+        ) D)
+        dip (Util ops-for-stack (
+            N  (S next)
+            N' (N next)
+            S' (env run {() : (Util ops-for-stack N' D)} [S get run :])
+            Util cons (N get) S'
+        ) D)
+        + (Util binop {run A B (A + B)} S D)
+        - (Util binop {run A B (A - B)} S D)
+        * (Util binop {run A B (A * B)} S D)
+        / (Util binop {run A B (A / B)} S D)
+        to-string (Util ops-for-stack (Util cons (S get to-string) (S next)) D)
+        print (Util ops-for-stack (
+            (io print (S get))
+            S next
+        ) D)
+        (env bind {() : (Self)} D)
+        : (S)
+    })
+}
+
+{: (Util ops-for-stack {} {})}

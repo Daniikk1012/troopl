@@ -1,0 +1,15 @@
+# Environment requirements:
+#   Import:
+#     Default environment
+#     lib.tr result
+#   Use: Nothing
+
+:
+
+define {
+    square (: dup *)
+    both   (: dup dip dip)
+    show   (: to-string print)
+}
+
+.(3) .(4) .[: square] both + .(5) - show

@@ -1,0 +1,9 @@
+# Entry point
+
+Util {import F (
+    Env {() filename (F)}
+    Lib (env run Env [eval (fs read F)])
+    () env bind {Env Lib} Lib
+)}
+
+() env run {() (Util import "lib.tr")} [Util import "main.tr"]

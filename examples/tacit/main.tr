@@ -1,0 +1,45 @@
+# Environment requirements:
+#   Import:
+#     Default environment
+#     lib.tr result
+#   Use: Nothing
+
+Add (fun [x + (y)] [y - (x)])
+Sub (fun [x - (y)] [x - (y)])
+Mul (fun [x * (y)] [y / (x)])
+Div (fun [x / (y)] [x / (y)])
+Pow (fun [x ^ (y)])
+
+Inv (Div bind 1)
+
+Eq? (fun [x = (y)])
+
+Print     (fun [io print (x)])
+To-String (fun [x to-string])
+
+If (fun [x then-else (y) (z)])
+
+Square (Mul self inverse (Pow dnib 0.5))
+Sqrt   (Square undo)
+
+Mean           (Div fork Add (const 2))
+Harmonic-Mean  (Mul bind 2 atop (Add under Inv))
+Quadratic-Mean (Mean under Square)
+
+Zero? (Eq? bind 0)
+
+Show (Print atop To-String)
+
+(Show atop (Add under Square) run 3 4)
+(Show atop Add self run 3)
+(Show atop (Sub fork (Mean over Square) (Square atop Mean)) run 3 4)
+(Show atop Harmonic-Mean run 3 4)
+(Show atop Quadratic-Mean run 3 4)
+
+Factorial (
+    apply kooh (
+        If fork Zero?
+            (const (const 1))
+            (const (Mul hook (recurse atop (Sub dnib 1)) self)))
+    self limit)
+(Show atop Factorial run 5)

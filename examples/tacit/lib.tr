@@ -1,0 +1,143 @@
+# Environment requirements:
+#   Import: Nothing
+#   Use:
+#     Methods of the result
+#     (env run Env Block)
+
+{
+    fun B (to-fun {
+        run X     (env run {() x (X)}             B)
+        run X Y   (env run {() x (X) y (Y)}       B)
+        run X Y Z (env run {() x (X) y (Y) z (Z)} B)
+    })
+    fun B I (fun B inverse (fun I))
+    const X (fun [X])
+    id (to-fun {
+          run X (X)
+        unrun X (X)
+    })
+    fst (to-fun {
+          run X     (X)
+          run X Y   (X)
+          run X Y Z (X)
+        unrun X     (X)
+    })
+    snd (to-fun {
+          run X Y   (Y)
+          run X Y Z (Y)
+        unrun X Y   (Y)
+    })
+    trd (to-fun {
+          run X Y Z (Z)
+        unrun X Y Z (Z)
+    })
+    apply (to-fun {
+          run X Y   (X   run Y)
+          run X Y Z (X   run Y Z)
+        unrun X Y   (X unrun Y)
+        unrun X Y Z (X unrun Y Z)
+    })
+    recurse (to-fun {
+          run X     (function   run X)
+          run X Y   (function   run X Y)
+          run X Y Z (function   run X Y Z)
+        unrun X     (function unrun X)
+        unrun X Y   (function unrun X Y)
+        unrun X Y Z (function unrun X Y Z)
+    })
+    to-fun F {
+        F
+        atop G (to-fun {
+              run X     (F run (G run X))
+              run X Y   (F run (G run X Y))
+              run X Y Z (F run (G run X Y Z))
+            unrun X     (G unrun     (F unrun X))
+            unrun X Y   (G unrun X   (F unrun Y))
+            unrun X Y Z (G unrun X Y (F unrun Z))
+        })
+        over G (to-fun {
+              run X     (F run (G run X))
+              run X Y   (F run (G run X) (G run Y))
+              run X Y Z (F run (G run X) (G run Y) (G run Z))
+            unrun X     (G unrun (F unrun                     X))
+            unrun X Y   (G unrun (F unrun (G run X)           Y))
+            unrun X Y Z (G unrun (F unrun (G run X) (G run Y) Z))
+        })
+        self  (to-fun {run X (F run X X)})
+        self3 (to-fun {run X (F run X X X)})
+        flip (to-fun {
+            run X Y   (F run   Y X)
+            run X Y Z (F run Z Y X)
+        })
+        fork G H (to-fun {
+            run X     (F run (G run X)     (H run X))
+            run X Y   (F run (G run X Y)   (H run X Y))
+            run X Y Z (F run (G run X Y Z) (H run X Y Z))
+        })
+        fork G H I (to-fun {
+            run X     (F run (G run X)     (H run X)     (I run X))
+            run X Y   (F run (G run X Y)   (H run X Y)   (I run X Y))
+            run X Y Z (F run (G run X Y Z) (H run X Y Z) (I run X Y Z))
+        })
+        hook G (to-fun {
+              run X Y   (F run X   (G run Y))
+              run X Y Z (F run X Y (G run Z))
+            unrun X Y   (G unrun (F unrun X Y))
+            unrun X Y Z (G unrun (F unrun X Y Z))
+        })
+        kooh G (to-fun {
+              run X Y   (F   run (G run X) Y)
+              run X Y Z (F   run (G run X) Y Z)
+            unrun X Y   (F unrun (G run X) Y)
+            unrun X Y Z (F unrun (G run X) Y Z)
+        })
+        hook G H (to-fun {
+              run X Y (F run (G run X) (H run Y))
+            unrun X Y (H unrun (F unrun (G run X) Y))
+        })
+        hook G H I (to-fun {
+              run X Y Z (F run (G run X) (H run Y) (I run Z))
+            unrun X Y Z (I unrun (F unrun (G run X) (H run Y) Z))
+        })
+        bind X (to-fun {
+              run Y   (F   run X Y)
+              run Y Z (F   run X Y Z)
+            unrun Y   (F unrun X Y)
+            unrun Y Z (F unrun X Y Z)
+        })
+        dnib X (to-fun {
+            run   Y (F run   Y X)
+            run Z Y (F run Z Y X)
+        })
+        limit (Self {(to-fun {
+              run X     (env run {() function (Self)} [F   run X])
+              run X Y   (env run {() function (Self)} [F   run X Y])
+              run X Y Z (env run {() function (Self)} [F   run X Y Z])
+            unrun X     (env run {() function (Self)} [F unrun X])
+            unrun X Y   (env run {() function (Self)} [F unrun X Y])
+            unrun X Y Z (env run {() function (Self)} [F unrun X Y Z])
+        })})
+        inverse G (to-fun {
+            F
+            unrun X     (G run X)
+            unrun X Y   (G run X Y)
+            unrun X Y Z (G run X Y Z)
+        })
+        undo (to-fun {
+              run X     (F unrun X)
+              run X Y   (F unrun X Y)
+              run X Y Z (F unrun X Y Z)
+            unrun X     (F   run X)
+            unrun X Y   (F   run X Y)
+            unrun X Y Z (F   run X Y Z)
+        })
+        under G (to-fun {
+              run X     (G unrun (F   run (G run X)))
+              run X Y   (G unrun (F   run (G run X) (G run Y)))
+              run X Y Z (G unrun (F   run (G run X) (G run Y) (G run Z)))
+            unrun X     (G unrun (F unrun (G run X)))
+            unrun X Y   (G unrun (F unrun (G run X) (G run Y)))
+            unrun X Y Z (G unrun (F unrun (G run X) (G run Y) (G run Z)))
+        })
+    }
+}
