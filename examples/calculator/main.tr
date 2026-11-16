@@ -3,8 +3,7 @@
 Source (fs read "stdlib/stdlib.tr")
 (Source ok? then-else [{}] [(crash (Source message))] run)
 Loader {() filename "stdlib/stdlib.tr"}
-Stdlib (env run Loader [(eval Source)])
-Environment (Stdlib extend ())
+Environment (env run Loader [(eval Source)])
 (env run Environment [
   Calculator (import "examples/calculator/calculator.tr")
   Session (Calculator new)
@@ -21,20 +20,20 @@ Environment (Stdlib extend ())
     )
     starts Text Prefix (
       Text size >= (Prefix size) then-else
-        [(Text substring 0 (Prefix size)) equals Prefix] [(false)] run
+        [(Text sub 0 (Prefix size)) = Prefix] [(false)] run
     )
-    argument Text N (Calculator trim (Text substring N (Text size)))
+    argument Text N (Calculator trim (Text sub N (Text size)))
     command Text (
-      Text equals ":help" then [UI help]
-      else-if [Text equals ":vars"] [
-        Session variables for-each {run Entry (
+      Text = ":help" then [UI help]
+      else-if [Text = ":vars"] [
+        Session variables to-seq for-each {run Entry (
           io print ((Entry name) + " = " + (Calculator format (Entry value)))
         )}
       ]
-      else-if [Text equals ":history"] [
-        Session history for-each {run Line (io print Line)}
+      else-if [Text = ":history"] [
+        Session history to-seq for-each {run Line (io print Line)}
       ]
-      else-if [Text equals ":clear"] [(Session clear) (io print "Session cleared.")]
+      else-if [Text = ":clear"] [(Session clear) (io print "Session cleared.")]
       else-if [UI starts Text ":save "] [
         R (Session save (UI argument Text 6))
         (UI report R)
@@ -59,16 +58,16 @@ Environment (Stdlib extend ())
       else-if [UI starts Text ":files "] [
         R (fs list-dir (UI argument Text 7))
         (UI report R)
-        R ok? then-else [R for-each {run Name (io print Name)}] [] run
+        R ok? then-else [R to-seq for-each {run Name (io print Name)}] [] run
       ]
-      else-if [Text equals ":pwd"] [
+      else-if [Text = ":pwd"] [
         R (fs working-dir)
         (UI report R)
         R ok? then-else [(io print R)] [] run
       ]
-      else-if [Text equals ":time"] [(io print (system time to-string))]
+      else-if [Text = ":time"] [(io print (system time to-string))]
       else-if [UI starts Text ":exec "] [
-        Command (list of and (UI argument Text 6) end)
+        Command (list < (UI argument Text 6) >)
         R (system run Command)
         (UI report R)
         R ok? then-else [
@@ -84,7 +83,7 @@ Environment (Stdlib extend ())
       Line (io read-line)
       Line ok? then-else [
         Text (Calculator trim Line)
-        Text equals ":quit" then-else [] [
+        Text = ":quit" then-else [] [
           (Text size > 0 then-else [
             (Text at 0) = 58 then-else [UI command Text] [
               R (Session calculate Line)
@@ -96,7 +95,7 @@ Environment (Stdlib extend ())
           UI loop
         ] run
       ] [
-        Line message equals "end of input" then-else [] [
+        Line message = "end of input" then-else [] [
           io error print ("Input error: " + (Line message))
         ] run
       ] run

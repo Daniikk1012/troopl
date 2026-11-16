@@ -95,7 +95,7 @@ and their exact output, alongside the existing interpreter tests.
 For complete understanding of the language, see
 [the specification](SPECIFICATION.pdf).
 
-## Environment and standard library
+## Environment
 
 Native interfaces are described in the specification. Implementation details:
 
@@ -107,19 +107,24 @@ Native interfaces are described in the specification. Implementation details:
 - Directory entries are sorted by byte order. Rename replacement behavior
   follows the host OS; working-directory changes affect the whole process.
 
-The [English standard library](stdlib/README.md) is opt-in and written in
-Troopl. It supplies boolean control flow, string/list operations, text-file
-helpers, and module import using the environment-wrapper pattern.
-
-```sh
-dune exec troopl -- stdlib/init.tr
-```
-
 Errors print `filename:line:column: category: message` to stderr and exit
 with status 1. Runtime filenames come from the active environment's
 `filename` method, with a source-filename fallback if it is missing or invalid.
 Position tracking uses bounded per-domain state and preserves guest tail calls.
 File-opening and reading errors report the filename without a source position.
+
+# Standard library
+
+The [English standard library](stdlib/README.md) is opt-in and written in
+Troopl. It supplies boolean control flow, string/list operations,
+and module import using the environment-wrapper pattern.
+
+For standard library usage example:
+
+```sh
+cd stdlib
+dune exec troopl -- init.tr
+```
 
 ## Calculator application
 

@@ -15,7 +15,7 @@ Calculator {
 
   find Entries Name I (
     I = (Entries size) then-else [1-] [
-      (Entries at I name) equals Name then-else [I] [
+      (Entries at I name) = Name then-else [I] [
         Calculator find Entries Name (I + 1)
       ] run
     ] run
@@ -77,13 +77,13 @@ Calculator {
       name-end Start (
         ((Calculator letter (P current)) or (Calculator digit (P current)))
           then-else [(P advance) P name-end Start]
-            [Text substring Start (Position get) strict] run
+            [Text sub Start (Position get) copy] run
       )
       name (P name-end (Position get))
       lookup Name (
-        Name equals "ans" then [Previous]
-        else-if [Name equals "pi"] [3.141592653589793]
-        else-if [Name equals "e"] [2.718281828459045]
+        Name = "ans" then [Previous]
+        else-if [Name = "pi"] [3.141592653589793]
+        else-if [Name = "e"] [2.718281828459045]
         else [
           I (Calculator find Variables Name 0)
           I >= 0 then-else [Variables at I value]
@@ -91,19 +91,19 @@ Calculator {
         ]
       )
       function-one Name A (
-        Name equals "abs" then [A abs]
-        else-if [Name equals "sqrt"] [
+        Name = "abs" then [A abs]
+        else-if [Name = "sqrt"] [
           A >= 0 then-else [A ^ 0.5] [P fail "sqrt expects a nonnegative value"] run
         ]
-        else-if [Name equals "floor"] [A floor]
-        else-if [Name equals "ceil"] [A ceil]
-        else-if [Name equals "trunc"] [A trunc]
+        else-if [Name = "floor"] [A floor]
+        else-if [Name = "ceil"] [A ceil]
+        else-if [Name = "trunc"] [A trunc]
         else [P fail ("unknown one-argument function: " + Name)]
       )
       function-two Name A B (
-        Name equals "min" then [A min B]
-        else-if [Name equals "max"] [A max B]
-        else-if [Name equals "pow"] [A ^ B]
+        Name = "min" then [A min B]
+        else-if [Name = "max"] [A max B]
+        else-if [Name = "pow"] [A ^ B]
         else [P fail ("unknown two-argument function: " + Name)]
       )
       primary (
@@ -200,21 +200,20 @@ Calculator {
   trim Text (
     Start (Calculator trim-left Text 0)
     Stop (Calculator trim-right Text (Text size))
-    Start < Stop then-else [Text substring Start Stop strict] [""] run
+    Start < Stop then-else [Text sub Start Stop copy] [""] run
   )
   join-lines Lines I Text (
-    I = (Lines size) then-else [Text strict] [
+    I = (Lines size) then-else [Text copy] [
       Calculator join-lines Lines (I + 1) (Text + (Lines at I) + "
 ")
     ] run
   )
   lines Text Start I Result (
     I = (Text size) then-else [
-      (Result push (Text substring Start I strict))
-      (list from Result)
+      Result push (Text sub Start I copy)
     ] [
       (Text at I) = 10 then-else [
-        (Result push (Text substring Start I strict))
+        (Result push (Text sub Start I copy))
         Calculator lines Text (I + 1) (I + 1) Result
       ] [Calculator lines Text Start (I + 1) Result] run
     ] run
@@ -230,7 +229,7 @@ Calculator {
         R (Calculator parser Line Variables (Previous get) run)
         R ok? then-else [
           Name (R binding)
-          ((Name equals "ans") or (Name equals "pi") or (Name equals "e"))
+          ((Name = "ans") or (Name = "pi") or (Name = "e"))
             then-else [Calculator failure "cannot assign to a constant" 1] [
               (Name size > 0 then-else [
                 Entry {name (Name) value (R value)}
@@ -244,8 +243,8 @@ Calculator {
             ] run
         ] [R] run
       )
-      variables (list from Variables)
-      history (list from History)
+      variables (Variables)
+      history (History)
       previous (Previous get)
       clear (
         (Session clear-array Variables)
@@ -257,7 +256,7 @@ Calculator {
       )
       save Path (fs write Path (Calculator join-lines History 0 ""))
       load Path (
-        Source (fs read-text Path)
+        Source (fs read Path)
         Source ok? then-else [
           Lines (Calculator lines Source 0 0 (array))
           Session replay Lines 0 0

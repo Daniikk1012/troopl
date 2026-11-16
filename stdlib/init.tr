@@ -1,7 +1,7 @@
-# Run from the repository root: dune exec troopl -- stdlib/init.tr
-Source (fs read "stdlib/stdlib.tr")
+# Run from the directory with your stdlib.tr and main.tr.
+Filename "stdlib.tr"
+Source (fs read Filename)
 (Source ok? then-else [{}] [(crash (Source message))] run)
-Loader {() filename "stdlib/stdlib.tr"}
+Loader {() filename (Filename)}
 Stdlib (env run Loader [(eval Source)])
-Environment (Stdlib extend ())
-(env run Environment [(import "stdlib/main.tr")])
+() env run Stdlib [raw-import "main.tr"]

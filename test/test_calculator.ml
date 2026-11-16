@@ -44,8 +44,7 @@ let with_file f =
 
 let () =
   let base = Env.make () in
-  let stdlib = eval base "../stdlib/stdlib.tr" (read "../stdlib/stdlib.tr") in
-  let env = call base stdlib "extend" [ base ] in
+  let env = eval base "../stdlib/stdlib.tr" (read "../stdlib/stdlib.tr") in
   let path = "../examples/calculator/calculator.tr" in
   let calculator = eval env path (read path) in
   check "calculator formats conventional negative signs"
