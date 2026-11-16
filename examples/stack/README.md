@@ -8,7 +8,7 @@ if it was a concatenative stack-based language similar to FORTH or Factor.
 To run the example, switch to this directory:
 
 ```sh
-cd examples/tacit
+cd examples/stack
 ```
 
 ... and then run:
