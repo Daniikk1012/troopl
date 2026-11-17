@@ -6,8 +6,6 @@ on the one used when loading the standard library.
 
 ## Run the demo
 
-From the repository root:
-
 ```sh
 cd stdlib
 dune exec troopl -- init.tr
@@ -24,7 +22,7 @@ lazy else-if
 
 `init.tr` loads the library and executes `main.tr` in the extended environment.
 Replace `main.tr` with application code; the loader can remain unchanged.
-Both paths are relative to the repository root.
+Both paths are relative to the working directory.
 
 ## Load and use
 

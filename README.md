@@ -55,27 +55,33 @@ runtime may report zero for the GC stack-size field; it is not a stack proof.
 
 Source files and their responsibilies:
 
-| Source               | Responsibility                          |
-|----------------------|-----------------------------------------|
-| `bin/main.ml`        | Entry point of the program              |
-| `lib/builtins.ml`    | Description of builtin types            |
-| `lib/env.ml`         | Description the default environment     |
-| `lib/encoding.ml`    | Lossless UTF-8 byte conversion          |
-| `lib/filesystem.ml`  | Byte-file and streaming capabilities    |
-| `lib/outcome.ml`     | Recoverable success/failure objects     |
-| `lib/utf8.ml`        | UTF-8 scalar validation and decoding    |
-| `lib/system.ml`      | Process execution, time, and exit       |
-| `lib/evaluator.ml`   | Evaluator for the IR                    |
-| `lib/expression.ml`  | Description of the AST                  |
-| `lib/ir.ml`          | Description of the IR                   |
-| `lib/lexer.ml`       | String -> token stream lexer            |
-| `lib/lowerer.ml`     | AST -> IR lowerer                       |
-| `lib/parser.ml`      | Token stream -> AST parser              |
-| `lib/position.ml`    | Description of the source position type |
-| `lib/runtime.ml`     | Common runtime definitions              |
-| `lib/token.ml`       | Description of a token                  |
-| `lib/value.ml`       | Description of a runtime value          |
-| `test/*.ml`          | Automatic tests                         |
+| Source                    | Responsibility                          |
+|---------------------------|-----------------------------------------|
+| `bin/main.ml`             | Entry point of the program              |
+| `lib/builtins.ml`         | Description of builtin types            |
+| `lib/capture_lowering.ml` | Optmizing lowering pass                 |
+| `lib/diagnostics.ml`      | Common utilities for diagnostics        |
+| `lib/encoding.ml`         | Lossless UTF-8 byte conversion          |
+| `lib/env.ml`              | Description the default environment     |
+| `lib/evaluator.ml`        | Evaluator for the IR                    |
+| `lib/expression.ml`       | Description of the AST                  |
+| `lib/filesystem.ml`       | Byte-file and streaming capabilities    |
+| `lib/ir.ml`               | Description of the IR                   |
+| `lib/lexer.ml`            | String -> token stream lexer            |
+| `lib/lowerer.ml`          | AST -> IR lowerer                       |
+| `lib/native_selectors.ml` | Selectors for all builtin methods       |
+| `lib/number_format.ml`    | Number formatting utilities             |
+| `lib/outcome.ml`          | Recoverable success/failure objects     |
+| `lib/parser.ml`           | Token stream -> AST parser              |
+| `lib/position.ml`         | Description of the source position type |
+| `lib/runtime.ml`          | Common runtime definitions              |
+| `lib/selector.ml`         | Description of a method selector        |
+| `lib/system.ml`           | Process execution, time, and exit       |
+| `lib/token.ml`            | Description of a token                  |
+| `lib/utf8.ml`             | UTF-8 scalar validation and decoding    |
+| `lib/value.ml`            | Description of a runtime value          |
+| `test/*.ml`               | Automatic tests                         |
+
 
 ## Language basics
 
