@@ -279,3 +279,26 @@ let () =
   with Parser.Error _ -> ()
 
 let () = print_endline "test_parser successful"
+
+let contains text needle =
+  let n = String.length needle in
+  let rec scan i =
+    i + n <= String.length text && (String.sub text i n = needle || scan (i + 1))
+  in
+  scan 0
+
+let parse_error source =
+  try
+    ignore (parse source);
+    assert false
+  with Parser.Error (message, pos) -> (message, pos)
+
+let () =
+  let message, _ = parse_error "(" in
+  assert (message = "unexpected end of file, expected ')'");
+  let message, pos = parse_error "X {get Y}" in
+  assert (pos.offset = 8);
+  assert (contains message "\"Y\" is a parameter of method \"get\"");
+  assert (contains message "write \"(Y)\"");
+  let message, _ = parse_error "X {get}" in
+  assert (not (contains message "parameter"))

@@ -20,12 +20,22 @@ let expand_decimal text =
         String.sub digits 0 point ^ "."
         ^ String.sub digits point (String.length digits - point)
 
+(* The fewest significant digits (at most 17) that read back as the same
+   float, so 0.1 prints as 0.1 rather than 0.10000000000000001. *)
+let shortest number =
+  let rec loop precision =
+    let text = Printf.sprintf "%.*g" precision number in
+    if precision >= 17 || float_of_string text = number then text
+    else loop (precision + 1)
+  in
+  loop 15
+
 let string_of_number number =
   if Float.is_nan number then "0nan"
   else if number = infinity then "0inf"
   else if number = neg_infinity then "0inf-"
   else
-    let text = Printf.sprintf "%.17g" (Float.abs number) |> expand_decimal in
+    let text = shortest (Float.abs number) |> expand_decimal in
     let text =
       if String.ends_with ~suffix:"." text then
         String.sub text 0 (String.length text - 1)

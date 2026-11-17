@@ -1,0 +1,8 @@
+; Standard library tests written in Troopl, run by the interpreter itself.
+(rule
+ (alias runtest)
+ (deps
+  ../stdlib.tr
+  (glob_files *.tr))
+ (action
+  (run %{exe:../../bin/main.exe} run.tr)))

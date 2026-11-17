@@ -5,7 +5,7 @@ For a larger application, see one of these examples:
   It has its own parser, variables, functions, recoverable errors, history,
   session save/load, filesystem inspection, and explicit process execution;
 - [Expense tracker](expenses/README.md).
-  If showcases how to work with modules and restrict their environment's
+  It showcases how to work with modules and restrict their environment's
   capabilities.
 
 For the examples showcasing alternative programming paradigms, see:

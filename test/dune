@@ -1,6 +1,5 @@
 (tests
  (names
-  test_troopl
   test_position
   test_lexer
   test_parser

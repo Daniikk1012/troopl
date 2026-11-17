@@ -34,7 +34,8 @@ let rec expression mapping : Ir.t -> Ir.t = function
           value = expression mapping call.value;
           args = List.map (expression mapping) call.args;
         }
-  | (Captured _ | Number _ | String _ | Environment) as value -> value
+  | String (text, pos) -> Text (Value.decode_utf_8 text, pos)
+  | (Captured _ | Number _ | Text _ | Environment) as value -> value
 
 and entry mapping : Ir.entry -> Ir.entry = function
   | Inclusion inclusion ->

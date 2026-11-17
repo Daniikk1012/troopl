@@ -55,7 +55,31 @@ let () =
       check ("roundtrip " ^ spelling)
         (if Float.is_nan value then Float.is_nan result
          else Int64.bits_of_float value = Int64.bits_of_float result))
-    [ nan; infinity; neg_infinity; 0.; -0.; 1e-300; -1e300 ];
+    [
+      nan;
+      infinity;
+      neg_infinity;
+      0.;
+      -0.;
+      1e-300;
+      -1e300;
+      0.1;
+      1. /. 3.;
+      0.1 +. 0.2;
+      5e-324;
+      max_float;
+    ];
+  List.iter
+    (fun (value, text) ->
+      check ("shortest " ^ text) (Builtins.string_of_number value = text))
+    [
+      (0.1, "0.1");
+      (1. /. 3., "0.3333333333333333");
+      (0.1 +. 0.2, "0.30000000000000004");
+      (-2.5, "2.5-");
+      (1e21, "1000000000000000000000");
+      (1e-7, "0.0000001");
+    ];
   check "negative zero text" (Builtins.string_of_number (-0.) = "0-");
   check "negative zero divide" (num (eval env "1 / 0-") = neg_infinity);
   check "negative zero negate" (not (Float.sign_bit (num (eval env "0- -"))));

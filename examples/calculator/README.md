@@ -26,7 +26,7 @@ calc> (2 + 3) * 4
 calc> radius = 5
 5
 calc> pi * radius ^ 2
-78.539816339744831
+78.53981633974483
 calc> sqrt(81) + max(2, 3)
 12
 calc> -2^2

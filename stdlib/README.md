@@ -53,5 +53,7 @@ For the list of all methods that the standard library environment provides, see
 ## Verification
 
 `dune runtest` covers control-flow laziness, string/list operations, views
-versus snapshots, imported environments, and module diagnostics.
+versus snapshots, imported environments, and module diagnostics. Library
+behaviour that Troopl can check by itself is tested in Troopl:
+`stdlib/test/run.tr` loads the library and runs every test file listed there.
 The original 50 examples remain runnable without installing this library.

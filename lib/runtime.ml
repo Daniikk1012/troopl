@@ -3,30 +3,41 @@
 
 exception Error of string * Position.t
 
-type context = {
-  position : Position.t;
-  filename : unit -> string;
-  reporting : bool;
-}
+(* The filename is computed only when an error is reported, from [source]
+   (the active environment) by a static function. Locating therefore
+   allocates one small record and no closure. Mutating a long-lived record
+   instead would be slower: every write goes through the write barrier. *)
+type context =
+  | Context : {
+      position : Position.t;
+      source : 'source;
+      filename : 'source -> string -> string;
+      reporting : bool;
+    }
+      -> context
 
 let initial =
-  {
-    position = Position.zero;
-    filename = (fun () -> "<unknown>");
-    reporting = false;
-  }
+  Context
+    {
+      position = Position.zero;
+      source = ();
+      filename = (fun () fallback -> fallback);
+      reporting = false;
+    }
 
 let context = Domain.DLS.new_key (fun () -> initial)
 let current () = Domain.DLS.get context
-let position () = (current ()).position
+let position () = match current () with Context { position; _ } -> position
 
-let set_location position filename =
-  let previous = current () in
-  Domain.DLS.set context { position; filename; reporting = previous.reporting }
+let set_location position source filename =
+  match current () with
+  | Context { reporting; _ } ->
+      Domain.DLS.set context (Context { position; source; filename; reporting })
 
-let set_environment filename =
-  let previous = current () in
-  Domain.DLS.set context { previous with filename }
+let set_environment source filename =
+  match current () with
+  | Context { position; reporting; _ } ->
+      Domain.DLS.set context (Context { position; source; filename; reporting })
 
 let protect f =
   let previous = current () in
@@ -42,14 +53,16 @@ let resume f =
 
 let error message =
   let saved = current () in
-  let fallback = Option.value saved.position.filename ~default:"<unknown>" in
-  let filename =
-    if saved.reporting then fallback
+  let (Context { position; source; filename; reporting }) = saved in
+  let fallback = Option.value position.filename ~default:"<unknown>" in
+  let name =
+    if reporting then fallback
     else
       Fun.protect
         ~finally:(fun () -> Domain.DLS.set context saved)
         (fun () ->
-          Domain.DLS.set context { saved with reporting = true };
-          try saved.filename () with _ -> fallback)
+          Domain.DLS.set context
+            (Context { position; source; filename; reporting = true });
+          try filename source fallback with _ -> fallback)
   in
-  raise (Error (message, Position.with_filename filename saved.position))
+  raise (Error (message, Position.with_filename name position))

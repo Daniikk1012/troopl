@@ -1,0 +1,10 @@
+# Runs the standard library tests written in Troopl. Each test file is
+# imported into the library's environment and crashes on the first failure.
+# From this directory: dune exec troopl -- run.tr
+Filename "../stdlib.tr"
+Source (fs read Filename)
+(Source ok? then-else [{}] [(crash (Source message))] run)
+Loader {() filename (Filename)}
+Stdlib (env run Loader [(eval Source)])
+(env run Stdlib [raw-import "to-number.tr"])
+(io print "stdlib tests passed")

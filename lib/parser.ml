@@ -4,17 +4,19 @@ exception Error of string * Position.t
 
 let advance parser = parser.token <- Lexer.next_token parser.lexer
 
-let expected message parser =
+let expected ?(hint = "") message parser =
   raise
     (Error
-       ( "unexpected token "
-         ^ Token.string_of_kind parser.token.kind
-         ^ ", expected " ^ message,
+       ( "unexpected "
+         ^ Token.describe parser.token.kind
+         ^ ", expected " ^ message ^ hint,
          parser.token.pos ))
 
 let expect kind parser =
   if parser.token.kind = kind then advance parser
-  else expected (Token.string_of_kind kind) parser
+  else expected (Token.describe kind) parser
+
+let value_description = "a value (variable, number, string, '(', '{' or '[')"
 
 let is_value_start (kind : Token.kind) =
   match kind with
@@ -72,9 +74,7 @@ and parse_value parser =
       let pos = parser.token.pos in
       let entries = parse_object_like parser in
       { kind = Object entries; pos }
-  | _ ->
-      expected "Variable, Number, String, OpenParen, OpenObject, or OpenBlock"
-        parser
+  | _ -> expected value_description parser
 
 and parse_object_like parser =
   match parser.token with
@@ -88,14 +88,25 @@ and parse_object_like parser =
       let body = parse_statements parser in
       expect CloseBlock parser;
       [ { kind = Method { name = "run"; args = []; body }; pos } ]
-  | _ -> expected "OpenObject or OpenBlock" parser
+  | _ -> expected "'{' or '['" parser
 
 and parse_entries parser =
   match parser.token with
   | { kind = Method name; pos } ->
       advance parser;
       let args = parse_args parser in
-      let body = parse_value parser in
+      let body =
+        match (args, parser.token.kind) with
+        | _ :: _, kind when not (is_value_start kind) ->
+            (* Every variable after a method name is a parameter, so a bare
+               variable can never be the body. *)
+            let last = List.nth args (List.length args - 1) in
+            expected value_description parser
+              ~hint:
+                ("; \"" ^ last ^ "\" is a parameter of method \"" ^ name
+               ^ "\", to return it write \"(" ^ last ^ ")\"")
+        | _ -> parse_value parser
+      in
       let entry : Expression.entry =
         { kind = Method { name; args; body }; pos }
       in

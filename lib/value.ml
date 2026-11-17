@@ -1,3 +1,11 @@
+(* Selectors are dense interned ints, so they are their own hash. *)
+module Methods = Hashtbl.Make (struct
+  type t = Selector.t
+
+  let equal (a : t) (b : t) = Int.equal (a :> int) (b :> int)
+  let hash (selector : t) = (selector :> int) land max_int
+end)
+
 type t = {
   mutable number : float option;
   mutable methods : storage;
@@ -6,10 +14,10 @@ type t = {
 
 and storage =
   | Empty
-  | Table of (Selector.t, callable) Hashtbl.t
+  | Table of callable Methods.t
   | Numeric of float
   | Shared of storage * int
-  | Overlay of (Selector.t, callable) Hashtbl.t * storage * int
+  | Overlay of callable Methods.t * storage * int
   | Merge of storage * storage * int
   | Bound of storage * t * (unit -> unit) * int
 
@@ -45,6 +53,23 @@ let depth = function
   | Merge (_, _, depth)
   | Bound (_, _, _, depth) ->
       depth
+
+(* Returned by [find] for a missing selector; compared physically. *)
+let absent : callable = fun _ _ -> invalid_arg "absent method"
+
+(* Booleans carry no state besides their truth, so every boolean shares one of
+   two tables. Initialized values never have their tables mutated: inclusion
+   and binding wrap a table instead of writing into it. *)
+let boolean_table bool =
+  let table = Methods.create 1 in
+  Methods.add table Native_selectors.id_then_else_2 (fun _ values ->
+      match values with
+      | [ a; b ] -> if bool then a else b
+      | _ -> invalid_arg "wrong arity");
+  table
+
+let true_table = boolean_table true
+let false_table = boolean_table false
 
 (* These shared bodies capture no guest object. Static recursive values let
    them call primitive constructors without a lazy cache or registration API.
@@ -106,63 +131,63 @@ and numeric_code selector =
   if i < 0 then missing selector;
   snd number_methods.(i)
 
-and contains storage selector =
+(* One traversal per lookup. Table and overlay hits return the stored body
+   without allocating; numeric and bound hits wrap it in a closure. *)
+and find storage selector =
   match storage with
-  | Empty -> false
-  | Table table -> Hashtbl.mem table selector
-  | Numeric _ -> numeric_index selector 0 (Array.length number_methods - 1) >= 0
-  | Shared (base, _) | Bound (base, _, _, _) ->
-      (contains [@tailcall]) base selector
-  | Overlay (delta, base, _) ->
-      Hashtbl.mem delta selector || (contains [@tailcall]) base selector
+  | Empty -> absent
+  | Table table -> (
+      match Methods.find table selector with
+      | body -> body
+      | exception Not_found -> absent)
+  | Numeric capture ->
+      let i = numeric_index selector 0 (Array.length number_methods - 1) in
+      if i < 0 then absent
+      else
+        let code = snd number_methods.(i) in
+        fun env args -> (code [@tailcall]) capture env args
+  | Shared (base, _) -> (find [@tailcall]) base selector
+  | Overlay (delta, base, _) -> (
+      match Methods.find delta selector with
+      | body -> body
+      | exception Not_found -> (find [@tailcall]) base selector)
   | Merge (later, earlier, _) ->
-      contains later selector || (contains [@tailcall]) earlier selector
+      let body = find later selector in
+      if body == absent then (find [@tailcall]) earlier selector else body
+  | Bound (base, env, before, _) ->
+      (* Resolving a binding captures only its lexical payload/environment,
+         never the whole overlay chain. Flattening can therefore release
+         hidden methods. Missing methods fail before the callback runs. *)
+      let body = find base selector in
+      if body == absent then absent
+      else fun _ args ->
+        before ();
+        (body [@tailcall]) env args
 
 (* Raw enumeration includes shadowed selectors, possibly more than once.
    Keep private: consumers must deduplicate before resolving or reporting. *)
 and iter_selectors f = function
   | Empty -> ()
-  | Table table -> Hashtbl.iter (fun selector _ -> f selector) table
+  | Table table -> Methods.iter (fun selector _ -> f selector) table
   | Numeric _ -> Array.iter (fun (selector, _) -> f selector) number_methods
   | Shared (base, _) | Bound (base, _, _, _) -> iter_selectors f base
   | Overlay (delta, base, _) ->
       iter_selectors f base;
-      Hashtbl.iter (fun selector _ -> f selector) delta
+      Methods.iter (fun selector _ -> f selector) delta
   | Merge (later, earlier, _) ->
       iter_selectors f earlier;
       iter_selectors f later
 
-(* Resolving a binding captures only its lexical payload/environment, never
-   the whole overlay chain. Flattening can therefore release hidden methods. *)
 and resolve storage selector =
-  match storage with
-  | Empty -> missing selector
-  | Table table -> (
-      try Hashtbl.find table selector with Not_found -> missing selector)
-  | Numeric capture ->
-      let code = numeric_code selector in
-      fun env args -> (code [@tailcall]) capture env args
-  | Shared (base, _) -> (resolve [@tailcall]) base selector
-  | Overlay (delta, base, _) -> (
-      match Hashtbl.find delta selector with
-      | body -> body
-      | exception Not_found -> (resolve [@tailcall]) base selector)
-  | Merge (later, earlier, _) ->
-      (resolve [@tailcall])
-        (if contains later selector then later else earlier)
-        selector
-  | Bound (base, env, before, _) ->
-      let body = resolve base selector in
-      fun _ args ->
-        before ();
-        (body [@tailcall]) env args
+  let body = find storage selector in
+  if body == absent then missing selector else body
 
 and invoke storage selector env args =
   match storage with
   | Empty -> missing selector
   | Table table ->
       let body =
-        try Hashtbl.find table selector with Not_found -> missing selector
+        try Methods.find table selector with Not_found -> missing selector
       in
       (body [@tailcall]) env args
   | Numeric capture ->
@@ -170,18 +195,12 @@ and invoke storage selector env args =
       (code [@tailcall]) capture env args
   | Shared (base, _) -> (invoke [@tailcall]) base selector env args
   | Overlay (delta, base, _) -> (
-      match Hashtbl.find delta selector with
+      match Methods.find delta selector with
       | body -> (body [@tailcall]) env args
       | exception Not_found -> (invoke [@tailcall]) base selector env args)
-  | Merge (later, earlier, _) ->
-      (invoke [@tailcall])
-        (if contains later selector then later else earlier)
-        selector env args
-  | Bound (base, bound_env, before, _) ->
-      (* Missing methods fail before the diagnostic/environment callback. *)
-      if not (contains base selector) then missing selector;
-      before ();
-      (invoke [@tailcall]) base selector bound_env args
+  | Merge _ | Bound _ ->
+      let body = resolve storage selector in
+      (body [@tailcall]) env args
 
 and extend env selector value =
   ensure_initialized env;
@@ -198,15 +217,13 @@ and make_number env number =
   extend env Native_selectors.id_number_1 value
 
 and make_boolean env bool =
-  let table = Hashtbl.create 16 in
-  Hashtbl.add table Native_selectors.id_then_else_2 (fun _ values ->
-      match values with
-      | [ a; b ] -> if bool then a else b
-      | _ -> invalid_arg "wrong arity");
+  let table = if bool then true_table else false_table in
   let value = { number = None; methods = Table table; initialized = true } in
   extend env Native_selectors.id_boolean_1 value
 
-and make_string env text =
+and make_string env text = make_string_codes env (decode_utf_8 text)
+
+and decode_utf_8 text =
   let codes = Dynarray.create () in
   let rec read i =
     if i < String.length text then (
@@ -218,20 +235,20 @@ and make_string env text =
       read (i + Uchar.utf_decode_length decoded))
   in
   read 0;
-  make_string_codes env (Dynarray.to_array codes)
+  Dynarray.to_array codes
 
 and make_byte_string env text = make_string_codes env (Utf8.lossless text)
 
 and make_string_codes env codes =
   let array = Array.map (fun code -> make_number env (float code)) codes in
   let size = make_number env (float (Array.length array)) in
-  let table = Hashtbl.create 16 in
-  Hashtbl.add table Native_selectors.id_at_1 (fun _ args ->
+  let table = Methods.create 2 in
+  Methods.add table Native_selectors.id_at_1 (fun _ args ->
       let index = List.hd args |> int_of_value in
       if index < 0 || index >= Array.length array then
         Runtime.error ("index out of bounds: " ^ string_of_int index);
       array.(index));
-  Hashtbl.add table Native_selectors.id_size_0 (fun _ _ -> size);
+  Methods.add table Native_selectors.id_size_0 (fun _ _ -> size);
   let value = { number = None; methods = Table table; initialized = true } in
   extend env Native_selectors.id_string_1 value
 
@@ -247,21 +264,21 @@ let max_depth = 8
 let bounded storage =
   if depth storage <= max_depth then storage
   else
-    let table = Hashtbl.create 16 in
+    let table = Methods.create 16 in
     iter_selectors
       (fun selector ->
-        if not (Hashtbl.mem table selector) then
-          Hashtbl.add table selector (resolve storage selector))
+        if not (Methods.mem table selector) then
+          Methods.add table selector (resolve storage selector))
       storage;
     Table table
 
 let add_method_id value selector body =
   assert (not value.initialized);
   match value.methods with
-  | Table table | Overlay (table, _, _) -> Hashtbl.replace table selector body
+  | Table table | Overlay (table, _, _) -> Methods.replace table selector body
   | base ->
-      let table = Hashtbl.create 16 in
-      Hashtbl.add table selector body;
+      let table = Methods.create 16 in
+      Methods.add table selector body;
       value.methods <-
         bounded
           (match base with
@@ -285,6 +302,9 @@ let add_methods into from =
 
 let invoke_id value selector env args =
   ensure_initialized value;
+  (invoke [@tailcall]) value.methods selector env args
+
+let invoke_checked value selector env args =
   (invoke [@tailcall]) value.methods selector env args
 
 let get_method_id value selector =

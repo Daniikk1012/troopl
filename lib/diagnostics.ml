@@ -4,12 +4,7 @@ let filename env fallback =
     |> Builtins.string_of_value env
   with _ -> fallback
 
-let set_environment env =
-  let fallback =
-    Option.value (Runtime.position ()).filename ~default:"<unknown>"
-  in
-  Runtime.set_environment (fun () -> filename env fallback)
-
-let locate env position =
-  let fallback = Option.value position.Position.filename ~default:"<unknown>" in
-  Runtime.set_location position (fun () -> filename env fallback)
+(* The environment is recorded, not a closure over it; [filename] runs only
+   when an error is reported. *)
+let set_environment env = Runtime.set_environment env filename
+let locate env position = Runtime.set_location position env filename

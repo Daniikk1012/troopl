@@ -312,12 +312,13 @@ Core/Extend' {
                 Size (Neg then-else (Size - 1) Size)
                 Self (Self sub 0 Size)
                 Dot (Self to-seq find-index {run X (X = Char'.')})
-                Before (Self sub 0 Dot reverse to-seq)
-                After (Self sub (Dot + 1 min Size) Size to-seq)
-                () seq iterate 1 {run X (X * 10)} zip Before
-                + (seq iterate 0.1 {run X (X / 10)} zip After)
-                map {run X (X a * (X b - Char'0'))}
-                left-fold 0 {run A B (A + B)}
+                # Exact integer digits divided once by an exact power of ten:
+                # correctly rounded while the digits fit in 2^53 and there
+                # are at most 22 fractional digits, like the literal syntax.
+                Scale (Size - Dot - 1 max 0)
+                Digits (Self to-seq filter {run X (X <> Char'.')}
+                    left-fold 0 {run A B (A * 10 + (B - Char'0'))})
+                Digits / (seq iterate 1 {run X (X * 10)} drop Scale run get)
                 * (Neg then-else 1- 1)
             ) ok? (true)}]
         ))
