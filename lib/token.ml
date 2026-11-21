@@ -28,3 +28,17 @@ let string_of_kind = function
 
 let to_string token =
   Position.to_string token.pos ^ ": " ^ string_of_kind token.kind
+
+(* User-facing spelling for diagnostics; [string_of_kind] stays for dumps. *)
+let describe = function
+  | OpenParen -> "'('"
+  | CloseParen -> "')'"
+  | OpenObject -> "'{'"
+  | CloseObject -> "'}'"
+  | OpenBlock -> "'['"
+  | CloseBlock -> "']'"
+  | Number x -> "number " ^ Number_format.string_of_number x
+  | String _ -> "string literal"
+  | Variable v -> "variable " ^ v
+  | Method m -> "method " ^ m
+  | Eof -> "end of file"

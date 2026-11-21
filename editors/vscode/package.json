@@ -1,0 +1,36 @@
+{
+  "name": "troopl",
+  "displayName": "TrOOPL",
+  "description": "Syntax highlighting for the TrOOPL language",
+  "version": "0.2.0",
+  "publisher": "troopl",
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "troopl",
+        "aliases": [
+          "TrOOPL",
+          "troopl"
+        ],
+        "extensions": [
+          ".tr"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "troopl",
+        "scopeName": "source.troopl",
+        "path": "./syntaxes/troopl.tmLanguage.json"
+      }
+    ]
+  }
+}

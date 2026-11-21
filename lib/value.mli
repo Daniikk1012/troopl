@@ -1,6 +1,10 @@
 type t
 
 val invoke_id : t -> Selector.t -> t -> t list -> t
+
+val invoke_checked : t -> Selector.t -> t -> t list -> t
+(** [invoke_id] for a receiver already checked by [ensure_initialized]. *)
+
 val uninitialized : unit -> t
 val set_number : t -> float -> unit
 val as_number : t -> float
@@ -27,5 +31,7 @@ val extend : t -> Selector.t -> t -> t
 val make_number : t -> float -> t
 val make_boolean : t -> bool -> t
 val make_string : t -> string -> t
+val make_string_codes : t -> int array -> t
+val decode_utf_8 : string -> int array
 val make_byte_string : t -> string -> t
 val int_of_value : t -> int

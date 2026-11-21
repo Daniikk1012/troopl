@@ -94,8 +94,15 @@ and lower_entry lowerer entry =
 let lower ?(optimize = true) expr =
   let lowerer = create () in
   let ir = lower_expr lowerer expr in
-  Hashtbl.iter
-    (fun s (i, p) -> raise (Error ("unknown variable \"" ^ s ^ "\"", p)))
-    lowerer.map;
+  (* Report the earliest occurrence, not whichever one hashing yields. *)
+  Hashtbl.fold
+    (fun name (_, (pos : Position.t)) first ->
+      match first with
+      | Some (_, (earliest : Position.t)) when earliest.offset <= pos.offset ->
+          first
+      | _ -> Some (name, pos))
+    lowerer.map None
+  |> Option.iter (fun (name, pos) ->
+      raise (Error ("unknown variable \"" ^ name ^ "\"", pos)));
   let ir = if optimize then Capture_lowering.lower lowerer.index ir else ir in
   { ir; scope_size = lowerer.index }

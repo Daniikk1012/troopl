@@ -1,0 +1,18 @@
+# Module import: binding to the module environment, filename, restriction.
+Path "stdlib-import-test-module.tr"
+(fs write Path "{value (answer) filename (filename)}" crash)
+(
+    Module (import {() answer 42} Path)
+    (expect "import binds methods to the module environment"
+        (env run {() answer 7} [Module value]) 42)
+    (expect "import supplies the module filename" (Module filename) Path)
+)
+(
+    C (core)
+    Module (import {core (C) answer (42)} Path)
+    (expect "module environment needs no fs or eval" (Module value) 42)
+)
+(expect "import-env binds" (import-env {() answer 5} Path value) 5)
+(expect "raw-import evaluates under the module environment"
+    (env run {() answer 3} [raw-import Path value]) 3)
+(fs remove Path crash)

@@ -1,0 +1,23 @@
+# Numbers: added methods, IEEE 754 sqrt and NaN-propagating min/max.
+NaN? {run X (X <> X)}
+
+(expect "abs" (12- abs) 12)
+(expect "abs positive" (3 abs) 3)
+(expect "min" (7 min 3) 3)
+(expect "max" (7 max 3) 7)
+(expect "floor division" (7 // 2) 3)
+(expect "floor division negative" (7- // 2) 4-)
+(expect "inv" (4 inv) 0.25)
+
+(expect "sqrt" (16 sqrt) 4)
+(expect "sqrt zero" (0 sqrt) 0)
+(expect "sqrt infinity" (0inf sqrt) 0inf)
+(check "sqrt negative is NaN" (NaN? run (4- sqrt)))
+(check "sqrt negative infinity is NaN" (NaN? run (0inf- sqrt)))
+
+(check "min NaN left" (NaN? run (0nan min 1)))
+(check "min NaN right" (NaN? run (1 min 0nan)))
+(check "max NaN left" (NaN? run (0nan max 1)))
+(check "max NaN right" (NaN? run (1 max 0nan)))
+(expect "min infinity" (0inf- min 5) 0inf-)
+(expect "max infinity" (0inf max 5) 0inf)

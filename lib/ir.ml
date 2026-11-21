@@ -11,6 +11,8 @@ type t =
   | Captured of int
   | Number of float * Position.t
   | String of string * Position.t
+  | Text of int array * Position.t
+      (** A string literal decoded to scalar values once, by the optimizer. *)
   | Environment
   | Call of {
       value : t;
@@ -56,6 +58,11 @@ let rec to_string = function
       "Number " ^ string_of_float n ^ " at " ^ Position.to_string pos
   | String (s, pos) ->
       "String \"" ^ String.escaped s ^ "\" at " ^ Position.to_string pos
+  | Text (codes, pos) ->
+      let text = Buffer.create (Array.length codes) in
+      Array.iter (fun code -> Buffer.add_utf_8_uchar text (Uchar.of_int code)) codes;
+      "Text \"" ^ String.escaped (Buffer.contents text) ^ "\" at "
+      ^ Position.to_string pos
   | Environment -> "Environment"
   | Call { value; selector; args; pos } ->
       "Call (" ^ to_string value ^ ") " ^ Selector.name selector

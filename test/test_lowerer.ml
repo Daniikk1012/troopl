@@ -176,4 +176,16 @@ let () =
     assert false
   with Lowerer.Error _ -> ()
 
+let () =
+  (* The earliest unknown variable in the source is reported. *)
+  for _ = 1 to 20 do
+    try
+      ignore (lower "A (B c Zed)
+(Q {m (Y)} R)" 0);
+      assert false
+    with Lowerer.Error (message, pos) ->
+      assert (message = "unknown variable \"B\"");
+      assert (pos.offset = 3)
+  done
+
 let () = print_endline "test_lowerer successful"

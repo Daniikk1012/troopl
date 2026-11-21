@@ -1,0 +1,45 @@
+# Booleans: operators, lazy control flow, comparisons, minimal operands.
+MT {then-else A B (A)}
+MF {then-else A B (B)}
+Cell (box 0)
+
+(refute "not true" ((true) not))
+(check "not false" ((false) not))
+(refute "and" ((true) and (false)))
+(check "or" ((false) or (true)))
+(refute "xor equal" ((true) xor (true)))
+(check "xor different" ((true) xor (false)))
+(check "implies" ((false) -> (false)))
+(refute "implies false" ((true) -> (false)))
+(refute "and-then is lazy" ((false) and-then [crash "unselected"]))
+(check "or-else is lazy" ((true) or-else [crash "unselected"]))
+(expect "then else" ((true) then [42] else [crash "unselected"]) 42)
+(expect "else-if" ((false) then [0] else-if [(true)] [42] else [7]) 42)
+(expect "else-if is lazy" (
+    (true) then [42] else-if [crash "unselected"] [0] else [7]
+) 42)
+(expect "final else" ((false) then [0] else-if [(false)] [1] else [42]) 42)
+((false) then [Cell set 1] end)
+(expect "then end skips" (Cell get) 0)
+(expect "true to-string" ((true) to-string) "true")
+(expect "false to-string" ((false) to-string) "false")
+
+(check "= on equal" ((true) = (true)))
+(check "<> on different" ((true) <> (false)))
+(check "> true false" ((true) > (false)))
+(check "< false true" ((false) < (true)))
+(check ">= true true" ((true) >= (true)))
+(check "<= false true" ((false) <= (true)))
+
+# Minimal booleans as the right operand.
+(check "= minimal" ((1 = 2) = MF))
+(refute "= minimal different" ((1 = 1) = MF))
+(check "<> minimal" ((1 = 1) <> MF))
+(check "> minimal" ((1 = 1) > MF))
+(refute "> minimal equal" ((1 = 1) > MT))
+(check "< minimal" ((1 = 2) < MT))
+(refute "< minimal equal" ((1 = 1) < MT))
+(check ">= minimal" ((1 = 1) >= MF))
+(check "<= minimal" ((1 = 2) <= MF))
+(check "and minimal" ((1 = 1) and MT))
+(check "or minimal" ((1 = 2) or MT))

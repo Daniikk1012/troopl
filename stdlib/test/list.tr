@@ -1,0 +1,95 @@
+# Lists: views versus copies, comparisons, minimal operands.
+Counter {new (
+    Count (box 0)
+    {
+        count (Count get)
+        list Size {
+            at I ((Count set (Count get + 1)) I)
+            size (Size)
+        }
+    }
+)}
+Same {= Other (true)}
+Different {
+    new Log {= Other ((Log set (Log get + 1)) (false))}
+}
+
+(expect "constructor size" (list < 1 , 2 , 3 > size) 3)
+(expect "constructor order" (list < 1 , 2 , 3 > at 2) 3)
+(expect "range at" (list range 10 15 at 3) 13)
+(expect "empty range" (list range 0 0 size) 0)
+(expect "repeat" (list repeat 7 3) (list < 7 , 7 , 7 >))
+(expect "map" (list range 0 3 map {run X (X * X)} at 2) 4)
+(expect "fold" (list range 1 6 to-seq left-fold 0 {run A B (A + B)}) 15)
+(expect "filter" (
+    list range 0 6 to-seq filter {run X (X mod 2 = 0)} to-list
+) (list < 0 , 2 , 4 >))
+(expect "concatenation" (list range 0 2 + (list range 2 4) at 3) 3)
+(expect "concatenation size" (list < 1 , 2 > + (list < 3 >) size) 3)
+(expect "zip" (list < 1 , 2 , 3 > zip (list < 4 , 5 >) size) 2)
+(expect "big copy" (list range 0 100000 copy at 99999) 99999)
+(expect "reverse" (list < 1 , 2 , 3 > reverse) (list < 3 , 2 , 1 >))
+(expect "sub" (list range 0 10 sub 2 5) (list < 2 , 3 , 4 >))
+(expect "to-string" (list < 1 , "a" > to-string) "list < 1 , ""a"" >")
+(expect "empty to-string" (list <> to-string) "list <>")
+(expect "bisect" (list range 0 10 bisect {run X (X >= 4)}) 4)
+(expect "bisect empty" (list <> bisect {run X (true)}) 0)
+(expect "find-sub-index" (list < 1 , 2 , 3 > find-sub-index (list < 2 , 3 >)) 1)
+
+# A map view recomputes on every access; copy materializes it.
+(
+    Cell (box 0)
+    M (list range 0 1 map {run X ((Cell set (Cell get + 1)) X)})
+    (M at 0) (M at 0)
+    (expect "map view recomputes" (Cell get) 2)
+)
+(
+    Cell (box 0)
+    M (list range 0 1 map {run X ((Cell set (Cell get + 1)) X)} copy)
+    (M at 0) (M at 0)
+    (expect "copy computes once" (Cell get) 1)
+)
+
+# Sorting is stable and uses <=.
+(
+    Item {make K T {k (K) t (T) <= Other (K <= (Other k))}}
+    Sorted (list < (Item make 1 "a") , (Item make 0 "b") ,
+        (Item make 1 "c") , (Item make 0 "d") > sort)
+    (expect "stable sort" (Sorted to-seq map {run X (X t)} to-list)
+        (list < "b" , "d" , "a" , "c" >))
+)
+(expect "sort numbers" (list < 3 , 1 , 2 > sort) (list < 1 , 2 , 3 >))
+
+# Comparisons.
+(check "equal" (list < 1 , 2 > = (list < 1 , 2 >)))
+(refute "different size" (list < 1 , 2 > = (list < 1 >)))
+(refute "different element" (list < 1 , 2 > = (list < 1 , 3 >)))
+(check "less" (list < 1 , 2 > < (list < 1 , 3 >)))
+(check "prefix is less" (list < 1 , 2 > < (list < 1 , 2 , 3 >)))
+(check "greater" (list < 1 , 2 , 3 > > (list < 1 , 2 >)))
+(check "<=" (list < 1 , 2 > <= (list < 1 , 2 >)))
+(check ">=" (list < 2 > >= (list < 1 , 9 >)))
+
+# = stops at the first unequal pair.
+(
+    Log (box 0)
+    D (Different new Log)
+    (list < D , D , D > = (list < D , D , D >))
+    (expect "= stops early" (Log get) 1)
+)
+(
+    C (Counter new)
+    (list < 0 , 5 , 5 > = (C list 3))
+    (expect "= indexes only until the difference" (C count) 2)
+)
+(check "= uses element equality" (list < Same > = (list < Same >)))
+
+# Minimal lists as the right operand.
+Minimal {at I (I) size (3)}
+(check "= minimal" (list < 0 , 1 , 2 > = Minimal))
+(check "< minimal" (list < 0 , 1 > < Minimal))
+(check "> minimal" (list < 0 , 5 > > Minimal))
+(check "<= minimal" (list < 0 , 1 , 2 > <= Minimal))
+(check ">= minimal" (list < 0 , 1 , 2 > >= Minimal))
+(expect "zip minimal" (list < 9 , 9 > zip Minimal size) 2)
+(expect "+ minimal" (list < 9 > + Minimal at 3) 2)

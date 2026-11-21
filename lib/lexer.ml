@@ -71,6 +71,22 @@ let number_of_string s =
       float_of_string_opt s |> Option.map (fun x -> x *. k)
     else None
 
+(* A numeric literal ends only at whitespace, a bracket, '"' or '#', so
+   "1+2" is one token. Suggest the split after the longest valid prefix. *)
+let invalid_number s =
+  let message = "invalid numeric literal \"" ^ s ^ "\"" in
+  let rec prefix n =
+    if n = 0 then None
+    else if Option.is_some (number_of_string (String.sub s 0 n)) then Some n
+    else prefix (n - 1)
+  in
+  match prefix (String.length s - 1) with
+  | Some n ->
+      message
+      ^ "; a number ends only at whitespace, a bracket, '\"' or '#', so put a "
+      ^ "space after \"" ^ String.sub s 0 n ^ "\""
+  | None -> message
+
 let take_string lexer =
   let buf = Buffer.create 16 in
   let rec loop () =
@@ -128,8 +144,7 @@ let rec next_token lexer : Token.t =
             let s = take_ident lexer in
             match number_of_string s with
             | Some x -> Number x
-            | None ->
-                raise (Error ("invalid numeric literal \"" ^ s ^ "\"", pos)))
+            | None -> raise (Error (invalid_number s, pos)))
         | Some '"' ->
             advance lexer;
             Token.String (take_string lexer)

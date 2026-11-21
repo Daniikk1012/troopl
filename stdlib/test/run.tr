@@ -1,0 +1,34 @@
+# Runs the standard library tests written in Troopl. Each test file is
+# imported into the library's environment extended with the assertions below,
+# and crashes on the first failure.
+# From this directory: dune exec troopl -- run.tr
+Filename "../stdlib.tr"
+Source (fs read Filename)
+(Source ok? then-else [{}] [(crash (Source message))] run)
+Loader {() filename (Filename)}
+Stdlib (env run Loader [(eval Source)])
+Tests {
+    Stdlib
+    # Condition may be a minimal boolean: only then-else is used.
+    check Label Condition (
+        Condition then-else [{}] [crash ("check failed: " + Label)] run
+    )
+    refute Label Condition (
+        Condition then-else [crash ("refute failed: " + Label)] [{}] run
+    )
+    expect Label Actual Expected (
+        Actual = Expected then [{}] else [crash (
+            Label + ": got " + (Actual to-string)
+            + ", expected " + (Expected to-string)
+        )]
+    )
+}
+(env run Tests [raw-import "boolean.tr"])
+(env run Tests [raw-import "number.tr"])
+(env run Tests [raw-import "to-number.tr"])
+(env run Tests [raw-import "string.tr"])
+(env run Tests [raw-import "list.tr"])
+(env run Tests [raw-import "array.tr"])
+(env run Tests [raw-import "seq.tr"])
+(env run Tests [raw-import "import.tr"])
+(io print "stdlib tests passed")

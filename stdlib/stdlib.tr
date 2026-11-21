@@ -31,13 +31,17 @@ Util {
     reverse List ({at I (List at (List size - I - 1)) size (List size)})
     make-list Accumulated {
         , Value (Util make-list (Util cons Value Accumulated))
-        > (core extend list (Util reverse (core from-seq Accumulated)))
+        # Copy the reversed view so indices (and their errors) are direct.
+        > (core extend list (core from-seq (
+            Util to-seq 0 (Util reverse (core from-seq Accumulated))
+        )))
     }
-    to-seq I List (core extend seq (I < (List size) then-else [{
-        cons? (true)
-        get (List at I)
-        next (Util to-seq (I + 1) List)
-    }] Nil))
+    to-seq I List (Util extend-seq [
+        I < (List size) then [
+            Value (List at I)
+            {cons? (true) get (Value) next (Util to-seq (I + 1) List)}
+        ] else Nil
+    ])
     conditional Choose {
         else Else-Block (Choose run Else-Block run)
         else-if Condition-Block Else-If-Block (Util conditional {
@@ -49,33 +53,32 @@ Util {
     }
     find-index Seq Predicate I (
         Node (Seq run)
-        Node cons? then [
-            Predicate run (Node get) then [I] else [
+        Node cons? then-else [
+            Predicate run (Node get) then-else [I] [
                 Util find-index (Node next) Predicate (I + 1)
-            ]
-        ] else [I]
+            ] run
+        ] [I] run
     )
-    intersperse Seq Value (core extend seq [
+    intersperse Seq Value (Util extend-seq [
         Node (Seq run)
         Node cons? then-else {
             cons? (true)
             get (Value)
-            next (core extend seq [{
+            next (Util extend-seq [{
                 cons? (true)
                 get (Node get)
                 next (Util intersperse (Node next) Value)
             }])
         } Node
     ])
-    left-scan Seq Default Function (core extend seq [
+    left-scan Seq Default Function (Util extend-seq [
         Node (Seq run)
-        Node cons? then [Value (Function run Default (Node get)) {
-            cons? (true)
-            get (Value)
-            next (Util left-scan (Node next) Value Function)
-        }] else [Node]
+        Node cons? then-else [
+            Value (Function run Default (Node get))
+            {cons? (true) get (Value) next (Util left-scan (Node next) Value Function)}
+        ] [Node] run
     ])
-    merge A B (core extend seq [
+    merge A B (Util extend-seq [
         Node-A (A run)
         Node-A cons? then [
             Node-B (B run)
@@ -143,6 +146,134 @@ Util {
     find-sub-index Text Pattern (Pattern size = 0 then-else [0] [
         Util kmp-scan Text Pattern (Util kmp-table Pattern) 0 0
     ] run)
+    # Index-by-index equality that stops at the first unequal pair.
+    list-equal A B I Size (I < Size then-else [
+        A at I = (B at I) then-else [Util list-equal A B (I + 1) Size] [false] run
+    ] [true] run)
+    # Default to-seq for a minimal list, which has only at and size.
+    list-like Other ({to-seq (Util to-seq 0 Other) Other})
+
+    # Adds the standard sequence methods to Minimal without touching its
+    # nodes, whose tails must already be standard sequences. core extend seq
+    # delegates here after making the tails standard; the library's own
+    # sequences call it directly, so each tail is wrapped only once.
+    extend-seq Minimal (Self {
+        Minimal
+        map Function (Util extend-seq [
+            Node (Self run)
+            Node cons? then-else [
+                Value (Function run (Node get))
+                {cons? (true) get (Value) next (Node next map Function)}
+            ] [Node] run
+        ])
+        filter Predicate (Util extend-seq [
+            Node (Self run)
+            Node cons? then-else [
+                Value (Node get)
+                Predicate run Value then-else [
+                    {cons? (true) get (Value) next (Node next filter Predicate)}
+                ] [Node next filter Predicate run] run
+            ] [Node] run
+        ])
+        zip Other (Util extend-seq [
+            Node (Self run)
+            Node cons? then-else [
+                Node' (Other run)
+                Node' cons? then-else [
+                    Pair (pair (Node get) (Node' get))
+                    {cons? (true) get (Pair) next (Node next zip (Node' next))}
+                ] [Node'] run
+            ] [Node] run
+        ])
+        # Other's nodes are used as they are: like every method, + assumes a
+        # standard Other. Extending it here would wrap again on every join,
+        # making flatten quadratic.
+        + Other (Util extend-seq [
+            Node (Self run)
+            Node cons? then-else [
+                {cons? (true) get (Node get) next (Node next + Other)}
+            ] [Other run] run
+        ])
+        take Number (Util extend-seq [
+            Number >= 1 then [
+                Node (Self run)
+                Node cons? then-else [{
+                    cons? (true)
+                    get (Node get)
+                    next (Node next take (Number - 1))
+                }] [Node] run
+            ] else Nil
+        ])
+        drop Number (Util extend-seq [
+            Number >= 1 then [
+                Node (Self run)
+                Node cons? then-else [Node next drop (Number - 1) run] [Node] run
+            ] else Self
+        ])
+        take-while Predicate (Util extend-seq [
+            Node (Self run)
+            Node cons? then-else [
+                Predicate run (Node get) then-else [{
+                    cons? (true)
+                    get (Node get)
+                    next (Node next take-while Predicate)
+                }] Nil run
+            ] [Node] run
+        ])
+        drop-while Predicate (Util extend-seq [
+            Node (Self run)
+            Node cons? then-else [
+                Predicate run (Node get) then-else [
+                    Node next drop-while Predicate run
+                ] [Node] run
+            ] [Node] run
+        ])
+        find-index Predicate (Util find-index Self Predicate 0)
+        intersperse Value (Util extend-seq [
+            Node (Self run)
+            Node cons? then-else {
+                cons? (true)
+                get (Node get)
+                next (Util intersperse (Node next) Value)
+            } Node
+        ])
+        left-fold Default Function (
+            Node (Self run)
+            Node cons? then-else [
+                Node next left-fold (Function run Default (Node get)) Function
+            ] [Default] run
+        )
+        right-fold Default Function (
+            Node (Self run)
+            Node cons? then-else [
+                Function run (Node get) [Node next right-fold Default Function]
+            ] [Default] run
+        )
+        left-scan Default Function (Util extend-seq [{
+            cons? (true)
+            get (Default)
+            next (Util left-scan Self Default Function)
+        }])
+        flatten (Util extend-seq [
+            Node (Self run)
+            Node cons? then-else [
+                Inner (Node get)
+                # Default + for a minimal inner sequence; its own + wins.
+                {+ Other (core extend seq Inner + Other) Inner}
+                + (Node next flatten) run
+            ] [Node] run
+        ])
+        for-each Function (
+            Node (Self run)
+            Node cons? then-else [
+                (Function run (Node get))
+                Node next for-each Function
+            ] [{}] run
+        )
+        to-string (core extend string (core from-seq Self))
+        to-list (core extend list (core from-seq Self))
+        to-array (Array (array) (Self for-each {run X (Array push X)}) Array)
+    })
 
     extend-list-like Self Extend-Function {
         map Function (Extend-Function run {
@@ -166,17 +297,15 @@ Util {
         })
         find-sub-index Sublist (Util find-sub-index Self Sublist)
         reverse (Extend-Function run (Util reverse Self))
-        sort (Util sort Self to-list)
+        sort (Extend-Function run (core from-seq (Util sort Self)))
         bisect Predicate (Util bisect Self Predicate 0 (Self size))
         = Other (Self size = (Other size) and-then [
-            Self to-seq zip (Other to-seq)
-            map {run X (X a = (X b))}
-            left-fold (true) {run A B (A and B)}
+            Util list-equal Self Other 0 (Self size)
         ])
         <> Other (Self = Other not)
         < Other (
             Node (
-                Self to-seq zip (Other to-seq)
+                Self to-seq zip (Util list-like Other to-seq)
                 drop-while {run X (X a = (X b))} run
             )
             Node cons? then [
@@ -186,7 +315,7 @@ Util {
         )
         > Other (
             Node (
-                Self to-seq zip (Other to-seq)
+                Self to-seq zip (Util list-like Other to-seq)
                 drop-while {run X (X a = (X b))} run
             )
             Node cons? then [
@@ -269,22 +398,30 @@ Core/Extend' {
         then Then-Block (Util conditional {
             run Else-Block (Self then-else Then-Block Else-Block)
         })
-        = Other (Self xor Other not)
+        # xor and -> may return a minimal Other, and Other may lack ->: the
+        # objects below supply default not and ->, and their own methods win.
+        = Other (X (Self xor Other) {not (X then-else [false] [true] run) X} not)
         <> Other (Self xor Other)
-        > Other (Self -> Other not)
-        < Other (Other -> Self not)
-        >= Other (Other -> Self)
+        > Other (X (Self -> Other) {not (X then-else [false] [true] run) X} not)
+        < Other ({-> Y (Other then-else [Y] [true] run) Other} -> Self not)
+        >= Other ({-> Y (Other then-else [Y] [true] run) Other} -> Self)
         <= Other (Self -> Other)
         to-string (Self then-else "true" "false")
     })
     number Minimal-Number (Self {
         (Core/Extend number Minimal-Number)
         // Other (Self / Other floor)
-        min Other (Self < Other then-else Self Other)
-        max Other (Self > Other then-else Self Other)
+        # NaN propagates, like IEEE 754-2019 minimum and maximum.
+        min Other (Self <> Self then [Self] else-if [Other <> Other] [Other] else [
+            Self < Other then-else Self Other
+        ])
+        max Other (Self <> Self then [Self] else-if [Other <> Other] [Other] else [
+            Self > Other then-else Self Other
+        ])
         abs (Self < 0 then [Self -] else [Self])
         inv (1 / Self)
-        sqrt (Self ^ 0.5)
+        # IEEE 754 pow gives 0inf for 0inf- ^ 0.5, but sqrt of a negative is NaN.
+        sqrt (Self < 0 then [0nan] else [Self ^ 0.5])
     })
     string Minimal-String (Self {
         (Core/Extend string Minimal-String)
@@ -312,12 +449,13 @@ Core/Extend' {
                 Size (Neg then-else (Size - 1) Size)
                 Self (Self sub 0 Size)
                 Dot (Self to-seq find-index {run X (X = Char'.')})
-                Before (Self sub 0 Dot reverse to-seq)
-                After (Self sub (Dot + 1 min Size) Size to-seq)
-                () seq iterate 1 {run X (X * 10)} zip Before
-                + (seq iterate 0.1 {run X (X / 10)} zip After)
-                map {run X (X a * (X b - Char'0'))}
-                left-fold 0 {run A B (A + B)}
+                # Exact integer digits divided once by an exact power of ten:
+                # correctly rounded while the digits fit in 2^53 and there
+                # are at most 22 fractional digits, like the literal syntax.
+                Scale (Size - Dot - 1 max 0)
+                Digits (Self to-seq filter {run X (X <> Char'.')}
+                    left-fold 0 {run A B (A * 10 + (B - Char'0'))})
+                Digits / (seq iterate 1 {run X (X * 10)} drop Scale run get)
                 * (Neg then-else 1- 1)
             ) ok? (true)}]
         ))
@@ -365,7 +503,13 @@ Core/Extend' {
             (Self pop)
             Value
         )
-        append Other ((Other to-seq for-each {run X (Self push X)}) Self)
+        # take fixes the length first, so appending an array to itself ends.
+        append Other (
+            (Util list-like Other to-seq take (Other size) for-each {run X (
+                Self push X
+            )})
+            Self
+        )
         reverse-in-place (
             Size (Self size)
             (list range 0 (Size // 2) to-seq for-each {run I (
@@ -384,117 +528,18 @@ Core/Extend' {
         )
         copy (Self to-seq to-array)
     })
-    seq Minimal-Seq (Self {
-        (Core/Extend seq Minimal-Seq)
-        map Function (core extend seq [
-            Node (Self run)
-            Node cons? then-else {
-                cons? (true)
-                get (Function run (Node get))
-                next (Node next map Function)
-            } Node
-        ])
-        filter Predicate (core extend seq [
-            Node (Self run)
-            Node cons? then [
-                Value (Node get)
-                Predicate run Value then [{
-                    cons? (true)
-                    get (Value)
-                    next (Node next filter Predicate)
-                }] else [Node next filter Predicate run]
-            ] else [Node]
-        ])
-        zip Other (core extend seq [
-            Node (Self run)
-            Node cons? then [
-                Node' (Other run)
-                Node' cons? then-else {
-                    cons? (true)
-                    get (pair (Node get) (Node' get))
-                    next (Node next zip (Node' next))
-                } Node'
-            ] else [Node]
-        ])
-        + Other (core extend seq [
-            Node (Self run)
-            Node cons? then [{
-                cons? (true)
-                get (Node get)
-                next (Node next + Other)
-            }] else [Other run]
-        ])
-        take Number (core extend seq [
-            Number >= 1 then [Node (Self run) Node cons? then-else {
-                cons? (true)
-                get (Node get)
-                next (Node next take (Number - 1))
-            } Node] else Nil
-        ])
-        drop Number (core extend seq [
-            Number >= 1 then [Node (Self run) Node cons? then [
-                Node next drop (Number - 1) run
-            ] else [Node]] else Self
-        ])
-        take-while Predicate (core extend seq [
-            Node (Self run)
-            Node cons? then [
-                Predicate run (Node get) then [{
-                    cons? (true)
-                    get (Node get)
-                    next (Node next take-while Predicate)
-                }] else Nil
-            ] else [Node]
-        ])
-        drop-while Predicate (core extend seq [
-            Node (Self run)
-            Node cons? then [
-                Predicate run (Node get) then [
-                    Node next drop-while Predicate run
-                ] else Self
-            ] else [Node]
-        ])
-        find-index Predicate (Util find-index Self Predicate 0)
-        intersperse Value (core extend seq [
-            Node (Self run)
-            Node cons? then-else {
-                cons? (true)
-                get (Node get)
-                next (Util intersperse (Node next) Value)
-            } Node
-        ])
-        left-fold Default Function (
-            Node (Self run)
-            Node cons? then [
-                Node next left-fold (Function run Default (Node get)) Function
-            ] else [Default]
-        )
-        right-fold Default Function (
-            Node (Self run)
-            Node cons? then [
-                Function run (Node get) [Node next right-fold Default Function]
-            ] else [Default]
-        )
-        left-scan Default Function (core extend seq [{
-            cons? (true)
-            get (Default)
-            next (Util left-scan Self Default Function)
-        }])
-        flatten (core extend seq [
-            Node (Self run)
-            Node cons? then [Node get + (Node next flatten) run] else [Node]
-        ])
-        for-each Function (
-            Node (Self run)
-            Node cons? then [
-                (Function run (Node get))
-                Node next for-each Function
-            ] end
-        )
-        to-string (core extend string (core from-seq Self))
-        to-list (core extend list (core from-seq Self))
-        to-array (Array (array) Self for-each {run X (Array push X)} Array)
-    })
+    # Each next of an extended sequence is extended too, so methods can rely
+    # on standard tails. The methods themselves live in Util extend-seq.
+    seq Minimal-Seq (
+        Base (Core/Extend seq Minimal-Seq)
+        Util extend-seq {
+            Base
+            run (Node (Base run) Node cons? then-else {
+                Node
+                next (core extend seq (Node next))
+            } Node)
+        }
+    )
     error Minimal-Error (Self {
         (Core/Extend error Minimal-Error)
         crash (Self ok? then [Self] else [crash (Self message)])
@@ -506,7 +551,10 @@ Core' {
 }
 List' {
     List
-    <> (core extend list {size 0})
+    <> (core extend list {
+        at I (crash ("index out of bounds: " + (I to-string)))
+        size 0
+    })
     # usage example: list < 1 , 2 , 3 >
     < Value (Util make-list Nil , Value)
     range Start End (core extend list {at I (Start + I) size (End - Start)})
@@ -514,19 +562,19 @@ List' {
 }
 Seq' {
     Seq
-    range Start (core extend seq [
+    range Start (Util extend-seq [
         {cons? (true) get (Start) next (seq range (Start + 1))}
     ])
-    repeat Value (Self {(core extend seq (Util cons Value Self))})
-    iterate First Function (core extend seq [{
+    repeat Value (Self {(Util extend-seq (Util cons Value Self))})
+    iterate First Function (Util extend-seq [{
         cons? (true)
         get (First)
         next (seq iterate (Function run First) Function)
     }])
-    single Value (core extend seq [{
+    single Value (Util extend-seq [{
         cons? (true)
         get (Value)
-        next (core extend seq Nil)
+        next (Util extend-seq Nil)
     }])
 }
 Env' {

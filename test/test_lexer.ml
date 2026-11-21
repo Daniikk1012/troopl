@@ -60,3 +60,25 @@ let () =
   List.iter test_fail [ "#\255"; "\"a\255\""; "A\255"; "a\255"; "\226\130" ];
   test "#я🙂\n\"я🙂\"" [ (String "я🙂", 8, 2, 1); (Eof, 16, 2, 5) ];
   print_endline "test_lexer successful"
+
+let contains text needle =
+  let n = String.length needle in
+  let rec scan i =
+    i + n <= String.length text && (String.sub text i n = needle || scan (i + 1))
+  in
+  scan 0
+
+let lex_error source =
+  let lexer = Lexer.create source in
+  let rec loop () =
+    match (Lexer.next_token lexer).kind with Eof -> () | _ -> loop ()
+  in
+  try
+    loop ();
+    assert false
+  with Lexer.Error (message, _) -> message
+
+let () =
+  assert (contains (lex_error "1+2") "put a space after \"1\"");
+  assert (contains (lex_error "1.5.2") "put a space after \"1.5\"");
+  assert (not (contains (lex_error "1e5") "put a space after \"1e\""))

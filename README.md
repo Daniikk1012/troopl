@@ -13,7 +13,7 @@ lexical variables, and capabilities are supplied through a dynamic environment.
   ```
   To build & run:
   ```sh
-  dune exec troopl [troopl args]
+  dune exec troopl -- [troopl args]
   ```
   To run tests:
   ```sh
@@ -31,6 +31,15 @@ dune exec troopl -- path/to/program.tr argument-one "argument two"
 ```
 
 `system args` includes the entry-point filename followed by these arguments.
+Options go before the filename:
+
+```text
+usage: troopl [--tokens | --ast | --ir] <file> [arguments...]
+       troopl --help | --version
+```
+
+`--tokens`, `--ast` and `--ir` print the token stream, the parsed expression
+tree or the lowered IR of `<file>` without running it.
 The v0.2 signal-exit conversion uses a small C stub and needs the C toolchain
 normally installed with OCaml.
 
@@ -49,20 +58,20 @@ runtime may report zero for the GC stack-size field; it is not a stack proof.
 ## Contributing
 
 - Use `ocamlformat` for formatting (`dune fmt` for project-wide formatting);
-- After applying changes, test them with `dune runtest` before commiting;
+- After applying changes, test them with `dune runtest` before committing;
 - Try to keep commits small and self-contained, to allow for easy
   commit-by-commit reviews.
 
-Source files and their responsibilies:
+Source files and their responsibilities:
 
 | Source                    | Responsibility                          |
 |---------------------------|-----------------------------------------|
 | `bin/main.ml`             | Entry point of the program              |
 | `lib/builtins.ml`         | Description of builtin types            |
-| `lib/capture_lowering.ml` | Optmizing lowering pass                 |
+| `lib/capture_lowering.ml` | Optimizing lowering pass                |
 | `lib/diagnostics.ml`      | Common utilities for diagnostics        |
 | `lib/encoding.ml`         | Lossless UTF-8 byte conversion          |
-| `lib/env.ml`              | Description the default environment     |
+| `lib/env.ml`              | Description of the default environment  |
 | `lib/evaluator.ml`        | Evaluator for the IR                    |
 | `lib/expression.ml`       | Description of the AST                  |
 | `lib/filesystem.ml`       | Byte-file and streaming capabilities    |
@@ -114,12 +123,13 @@ Native interfaces are described in the specification. Implementation details:
   follows the host OS; working-directory changes affect the whole process.
 
 Errors print `filename:line:column: category: message` to stderr and exit
-with status 1. Runtime filenames come from the active environment's
+with status 1. Guest recursion that exhausts the OCaml stack is reported as a
+`RUNTIME ERROR` at the call that overflowed. Runtime filenames come from the active environment's
 `filename` method, with a source-filename fallback if it is missing or invalid.
 Position tracking uses bounded per-domain state and preserves guest tail calls.
 File-opening and reading errors report the filename without a source position.
 
-# Standard library
+## Standard library
 
 The [English standard library](stdlib/README.md) is opt-in and written in
 Troopl. It supplies boolean control flow, string/list operations,
@@ -146,11 +156,17 @@ The calculator parses its own input language; it does not evaluate user input
 as Troopl source. The test suite covers the original 50 examples, Version 0.1
 capabilities, and calculator arithmetic, error recovery, persistence, and CLI IO.
 
-## Shared-storage experiment
+## Method storage
 
-This branch refines the shared numeric layout prototype with bounded method
-overlays for inclusion and environment binding. It preserves custom literal
-hooks and lexical method captures, with no implicit self. See the
+Objects store methods in shared numeric layouts with bounded overlays for
+inclusion and environment binding (`lib/value.ml`). Custom literal hooks and
+lexical method captures are preserved, with no implicit self. See the
 [benchmark and validation report](benchmarks/SHARED_LAYOUT_OVERLAYS.md) for
-architecture, reproducible measurements and remaining regressions. This
-experimental representation has not been merged into production.
+architecture and measurements.
+
+## Syntax highlighting
+
+[`editors/`](editors/README.md) contains a TextMate grammar (VS Code, Shiki),
+a Sublime syntax (Sublime Text, bat, Typst `raw` blocks) and a Notepad++
+user-defined language, following the
+tokenization rules and grammar of the specification.

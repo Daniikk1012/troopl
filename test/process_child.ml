@@ -1,4 +1,8 @@
 let () =
+  (* Byte-exact pipes: no newline translation on Windows. *)
+  set_binary_mode_in stdin true;
+  set_binary_mode_out stdout true;
+  set_binary_mode_out stderr true;
   if Array.length Sys.argv = 1 then print_endline "child-ready"
   else
     match Sys.argv.(1) with

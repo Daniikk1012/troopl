@@ -52,6 +52,16 @@ For the list of all methods that the standard library environment provides, see
 
 ## Verification
 
-`dune runtest` covers control-flow laziness, string/list operations, views
-versus snapshots, imported environments, and module diagnostics.
-The original 50 examples remain runnable without installing this library.
+The library is tested in Troopl itself. `stdlib/test/run.tr` loads it, adds
+the assertions `check`, `refute` and `expect` to its environment, and imports
+every test file listed there; the first failed assertion crashes with its
+label. `dune runtest` runs it, or run it by hand:
+
+```sh
+cd stdlib/test
+dune exec troopl -- run.tr
+```
+
+Only crashes, which Troopl cannot observe, are checked from OCaml
+(`test/test_cli.ml`). The original 50 examples remain runnable without
+installing this library.

@@ -1,0 +1,39 @@
+# string to-number reads a decimal like the numeric literal syntax does.
+Check {run Text Expected (
+    Result (Text to-number)
+    Result ok? and-then [Result = Expected] then [{}] else [
+        crash ("""" + Text + """ to-number gave "
+            + (Result ok? then [Result to-string] else ["an error"])
+            + ", expected " + (Expected to-string))
+    ]
+)}
+Rejects {run Text (
+    Text to-number ok? then [crash ("""" + Text + """ to-number succeeded")]
+    else [{}]
+)}
+Round-trips {run Number (Check run (Number to-string) Number)}
+
+(Check run "0" 0)
+(Check run "12" 12)
+(Check run "12." 12.)
+(Check run "1.5-" 1.5-)
+(Check run "0.1" 0.1)
+(Check run "0.3" 0.3)
+(Check run "2.675" 2.675)
+(Check run "123.456" 123.456)
+(Check run "0.000001" 0.000001)
+(Check run "0.30000000000000004" 0.30000000000000004)
+(Check run "9007199254740993" 9007199254740993)
+
+(Round-trips run 0.1)
+(Round-trips run (1 / 3))
+(Round-trips run (2 / 3 -))
+(Round-trips run (0.1 + 0.2))
+(Round-trips run (1 / 10000000))
+(Round-trips run 6.02214076)
+
+(Rejects run "")
+(Rejects run "abc")
+(Rejects run "1.2.3")
+(Rejects run "-1")
+(Rejects run "1-2")
