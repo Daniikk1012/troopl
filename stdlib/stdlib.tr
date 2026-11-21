@@ -31,7 +31,10 @@ Util {
     reverse List ({at I (List at (List size - I - 1)) size (List size)})
     make-list Accumulated {
         , Value (Util make-list (Util cons Value Accumulated))
-        > (core extend list (Util reverse (core from-seq Accumulated)))
+        # Copy the reversed view so indices (and their errors) are direct.
+        > (core extend list (core from-seq (
+            Util to-seq 0 (Util reverse (core from-seq Accumulated))
+        )))
     }
     to-seq I List (Util extend-seq [
         I < (List size) then [
@@ -143,6 +146,13 @@ Util {
     find-sub-index Text Pattern (Pattern size = 0 then-else [0] [
         Util kmp-scan Text Pattern (Util kmp-table Pattern) 0 0
     ] run)
+    # Index-by-index equality that stops at the first unequal pair.
+    list-equal A B I Size (I < Size then-else [
+        A at I = (B at I) then-else [Util list-equal A B (I + 1) Size] [false] run
+    ] [true] run)
+    # Default to-seq for a minimal list, which has only at and size.
+    list-like Other ({to-seq (Util to-seq 0 Other) Other})
+
     # Adds the standard sequence methods to Minimal without touching its
     # nodes, whose tails must already be standard sequences. core extend seq
     # delegates here after making the tails standard; the library's own
@@ -287,17 +297,15 @@ Util {
         })
         find-sub-index Sublist (Util find-sub-index Self Sublist)
         reverse (Extend-Function run (Util reverse Self))
-        sort (Util sort Self to-list)
+        sort (Extend-Function run (core from-seq (Util sort Self)))
         bisect Predicate (Util bisect Self Predicate 0 (Self size))
         = Other (Self size = (Other size) and-then [
-            Self to-seq zip (Other to-seq)
-            map {run X (X a = (X b))}
-            left-fold (true) {run A B (A and B)}
+            Util list-equal Self Other 0 (Self size)
         ])
         <> Other (Self = Other not)
         < Other (
             Node (
-                Self to-seq zip (Other to-seq)
+                Self to-seq zip (Util list-like Other to-seq)
                 drop-while {run X (X a = (X b))} run
             )
             Node cons? then [
@@ -307,7 +315,7 @@ Util {
         )
         > Other (
             Node (
-                Self to-seq zip (Other to-seq)
+                Self to-seq zip (Util list-like Other to-seq)
                 drop-while {run X (X a = (X b))} run
             )
             Node cons? then [
@@ -495,7 +503,13 @@ Core/Extend' {
             (Self pop)
             Value
         )
-        append Other ((Other to-seq for-each {run X (Self push X)}) Self)
+        # take fixes the length first, so appending an array to itself ends.
+        append Other (
+            (Util list-like Other to-seq take (Other size) for-each {run X (
+                Self push X
+            )})
+            Self
+        )
         reverse-in-place (
             Size (Self size)
             (list range 0 (Size // 2) to-seq for-each {run I (
@@ -537,7 +551,10 @@ Core' {
 }
 List' {
     List
-    <> (core extend list {size 0})
+    <> (core extend list {
+        at I (crash ("index out of bounds: " + (I to-string)))
+        size 0
+    })
     # usage example: list < 1 , 2 , 3 >
     < Value (Util make-list Nil , Value)
     range Start End (core extend list {at I (Start + I) size (End - Start)})

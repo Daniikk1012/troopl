@@ -151,6 +151,8 @@ let () =
           check ("stdlib crash message: " ^ body) (contains error message)))
     [
       ("\"abc\" reverse at 3", "RUNTIME ERROR: index out of bounds");
+      ("list <> at 0", "RUNTIME ERROR: index out of bounds: 0");
+      ("list < 1 > at 5", "RUNTIME ERROR: index out of bounds: 5");
       ("array pop", "RUNTIME ERROR");
     ];
   let module_path = Filename.temp_file "troopl-module-" ".tr" in
