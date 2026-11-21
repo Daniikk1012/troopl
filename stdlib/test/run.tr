@@ -26,5 +26,6 @@ Tests {
 (env run Tests [raw-import "boolean.tr"])
 (env run Tests [raw-import "number.tr"])
 (env run Tests [raw-import "to-number.tr"])
+(env run Tests [raw-import "seq.tr"])
 (env run Tests [raw-import "import.tr"])
 (io print "stdlib tests passed")

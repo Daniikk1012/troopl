@@ -1,0 +1,93 @@
+# Sequences: generators, laziness, minimal inputs, single consumption.
+Two {run {cons? (true) get (1) next {run {cons? (true) get (2) next {
+    run {cons? (false)}
+}}}}}
+S (core extend seq Two)
+
+(expect "range" (seq range 3 take 3 to-list) (list < 3 , 4 , 5 >))
+(expect "repeat" (seq repeat 7 take 2 to-list) (list < 7 , 7 >))
+(expect "iterate" (seq iterate 1 {run X (X * 2)} take 4 to-list)
+    (list < 1 , 2 , 4 , 8 >))
+(expect "single" (seq single 5 to-list) (list < 5 >))
+(expect "single next is standard" (seq single 5 run next to-list) (list <>))
+(expect "left-scan" (list < 1 , 2 , 3 > to-seq left-scan 0 {run A B (A + B)}
+    to-list) (list < 0 , 1 , 3 , 6 >))
+(expect "intersperse" (list < 1 , 2 , 3 > to-seq intersperse 0 to-list)
+    (list < 1 , 0 , 2 , 0 , 3 >))
+(expect "find-index" (list < 4 , 5 , 6 > to-seq find-index {run X (X = 5)}) 1)
+(expect "find-index missing" (list < 4 , 5 > to-seq find-index {run X (X = 9)}) 2)
+(expect "take negative" (seq range 0 take 2- to-list) (list <>))
+(expect "drop negative" (list < 1 , 2 > to-seq drop 2- to-list) (list < 1 , 2 >))
+(expect "drop past the end" (list < 1 , 2 > to-seq drop 5 to-list) (list <>))
+(expect "right-fold short-circuits" (seq range 1 right-fold 0 {run V Acc (
+    V > 3 then [V] else [Acc run]
+)}) 4)
+(expect "to-string" (list < 104 , 105 > to-seq to-string) "hi")
+(expect "flatten" (list < (list < 1 > to-seq) , (list < 2 , 3 > to-seq) > to-seq
+    flatten to-list) (list < 1 , 2 , 3 >))
+(
+    Log (box 0)
+    Other {run ((Log set 1) {cons? (false)})}
+    (list <> to-seq zip Other to-list)
+    (expect "zip checks Self before Other" (Log get) 0)
+)
+
+# Hand-written minimal sequences.
+(expect "map minimal" (S map {run X (X * 10)} to-list) (list < 10 , 20 >))
+(expect "filter minimal" (S filter {run X (X > 1)} to-list) (list < 2 >))
+(expect "zip minimal" (S zip Two to-list size) 2)
+(expect "+ minimal" (S + Two to-list) (list < 1 , 2 , 1 , 2 >))
+(expect "+ with an extended Other stays standard"
+    (S + (core extend seq Two) drop 3 to-list) (list < 2 >))
+(expect "take minimal" (S take 5 to-list) (list < 1 , 2 >))
+(expect "drop minimal" (S drop 1 to-list) (list < 2 >))
+(expect "take-while minimal" (S take-while {run X (X < 2)} to-list) (list < 1 >))
+(expect "drop-while minimal" (S drop-while {run X (X < 2)} to-list) (list < 2 >))
+(expect "left-fold minimal" (S left-fold 0 {run A B (A + B)}) 3)
+(expect "right-fold minimal" (S right-fold 0 {run V Acc (V + (Acc run))}) 3)
+(
+    Cell (box 0)
+    (S for-each {run X (Cell set (Cell get + X))})
+    (expect "for-each minimal" (Cell get) 3)
+)
+(expect "next of a minimal sequence is standard"
+    (S run next map {run X (X * 10)} to-list) (list < 20 >))
+(expect "flatten minimal inner" (seq single Two flatten to-list) (list < 1 , 2 >))
+(
+    Custom {run {cons? (true) get (1) next {run {cons? (false)}}}
+        + Other (seq single 99)}
+    (expect "flatten keeps a custom +" (seq single Custom flatten to-list)
+        (list < 99 >))
+)
+
+# Each element is computed once per run.
+(
+    Log (box 0)
+    Input {run ((Log set (Log get + 1)) (list < 5 , 1 > to-seq run))}
+    (core extend seq Input drop-while {run X (X < 3)} to-list)
+    (expect "drop-while runs its input once" (Log get) 1)
+)
+(
+    Log (box 0)
+    M (list < 5 , 1 > to-seq map {run X ((Log set (Log get + 1)) X)})
+    Node (M drop-while {run X (X < 3)} run)
+    (Node get) (Node get)
+    (expect "map runs its function once per element" (Log get) 1)
+)
+(
+    Log (box 0)
+    Counted {() pair A B ((Log set (Log get + 1)) {a (A) b (B)})}
+    Node (env run Counted [list < 1 > to-seq zip (list < 2 > to-seq) run])
+    (Node get) (Node get)
+    (expect "zip pairs once per element" (Log get) 1)
+)
+
+# Wrapping stays one level deep, so long pipelines stay linear.
+(expect "long pipeline" (
+    seq range 0 map {run X (X * 2)} filter {run X (X mod 3 = 0)} take 20000
+    left-fold 0 {run A B (A + 1)}
+) 20000)
+(expect "long flatten" (
+    seq range 0 take 5000 map {run X (seq single X)} flatten
+    left-fold 0 {run A B (A + 1)}
+) 5000)
