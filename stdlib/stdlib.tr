@@ -280,11 +280,17 @@ Core/Extend' {
     number Minimal-Number (Self {
         (Core/Extend number Minimal-Number)
         // Other (Self / Other floor)
-        min Other (Self < Other then-else Self Other)
-        max Other (Self > Other then-else Self Other)
+        # NaN propagates, like IEEE 754-2019 minimum and maximum.
+        min Other (Self <> Self then [Self] else-if [Other <> Other] [Other] else [
+            Self < Other then-else Self Other
+        ])
+        max Other (Self <> Self then [Self] else-if [Other <> Other] [Other] else [
+            Self > Other then-else Self Other
+        ])
         abs (Self < 0 then [Self -] else [Self])
         inv (1 / Self)
-        sqrt (Self ^ 0.5)
+        # IEEE 754 pow gives 0inf for 0inf- ^ 0.5, but sqrt of a negative is NaN.
+        sqrt (Self < 0 then [0nan] else [Self ^ 0.5])
     })
     string Minimal-String (Self {
         (Core/Extend string Minimal-String)
