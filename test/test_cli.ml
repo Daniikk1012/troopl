@@ -132,4 +132,38 @@ let () =
       check "stack overflow position"
         (contains error (filename ^ ":1:")
         && contains error "RUNTIME ERROR: stack overflow"));
+  (* Standard library crashes: everything else about the library is tested
+     in Troopl itself (stdlib/test), which cannot observe a crash. *)
+  let with_stdlib body =
+    with_source
+      ("Filename \"../stdlib/stdlib.tr\"\n\
+        Source (fs read Filename)\n\
+        (Source ok? then-else [{}] [(crash (Source message))] run)\n\
+        Loader {() filename (Filename)}\n\
+        Stdlib (env run Loader [(eval Source)])\n\
+        (env run Stdlib [" ^ body ^ "])\n")
+  in
+  List.iter
+    (fun (body, message) ->
+      with_stdlib body (fun filename ->
+          let status, _, error = run filename in
+          check ("stdlib crash status: " ^ body) (status = Unix.WEXITED 1);
+          check ("stdlib crash message: " ^ body) (contains error message)))
+    [
+      ("\"abc\" reverse at 3", "RUNTIME ERROR: index out of bounds");
+      ("array pop", "RUNTIME ERROR");
+    ];
+  let module_path = Filename.temp_file "troopl-module-" ".tr" in
+  Fun.protect
+    ~finally:(fun () -> Sys.remove module_path)
+    (fun () ->
+      Out_channel.with_open_bin module_path (fun c ->
+          output_string c "{run ({} missing)}");
+      with_stdlib
+        ("import \"" ^ module_path ^ "\" run")
+        (fun filename ->
+          let status, _, error = run filename in
+          check "imported method crash status" (status = Unix.WEXITED 1);
+          check "imported method reports module filename and position"
+            (contains error (module_path ^ ":1:10: RUNTIME ERROR"))));
   print_endline "CLI filename, arguments, IO, exit and crash checks passed"
