@@ -269,11 +269,13 @@ Core/Extend' {
         then Then-Block (Util conditional {
             run Else-Block (Self then-else Then-Block Else-Block)
         })
-        = Other (Self xor Other not)
+        # xor and -> may return a minimal Other, and Other may lack ->: the
+        # objects below supply default not and ->, and their own methods win.
+        = Other (X (Self xor Other) {not (X then-else [false] [true] run) X} not)
         <> Other (Self xor Other)
-        > Other (Self -> Other not)
-        < Other (Other -> Self not)
-        >= Other (Other -> Self)
+        > Other (X (Self -> Other) {not (X then-else [false] [true] run) X} not)
+        < Other ({-> Y (Other then-else [Y] [true] run) Other} -> Self not)
+        >= Other ({-> Y (Other then-else [Y] [true] run) Other} -> Self)
         <= Other (Self -> Other)
         to-string (Self then-else "true" "false")
     })
